@@ -224,7 +224,7 @@ namespace esphome
       int write_state = this->write_update_pending ? 2 : 0;
 
       // build payload in message buffer
-      message.push_back(this->parent_->get_tx_byte_0());
+      message.push_back(0);
       message.push_back(0);
       message.push_back(request_id);
       message.push_back(this->zone_number);
@@ -373,6 +373,20 @@ namespace esphome
           publish_update = true;
         } else {
           ESP_LOGD(TAG, "Temperature update time hasn't lapsed. Ignoring temperature difference...");
+        }
+      }
+
+      // Extract load/operation byte (Byte 10 in the response)
+      // This byte represents the unit's operation rate/load (0-255)
+      uint8_t load_byte = message[10];
+      if (load_byte != this->load_byte_)
+      {
+        ESP_LOGD(TAG, "Load byte changed: %d -> %d", this->load_byte_, load_byte);
+        this->load_byte_ = load_byte;
+        // Trigger power recalculation in parent
+        if (this->parent_ != nullptr)
+        {
+          this->parent_->calculate_and_publish_power();
         }
       }
 

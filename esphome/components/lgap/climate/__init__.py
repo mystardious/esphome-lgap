@@ -1,8 +1,11 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import climate
+from esphome.components import climate, sensor
 from esphome.const import (
     CONF_ID,
+    UNIT_KILOWATT,
+    DEVICE_CLASS_POWER,
+    STATE_CLASS_MEASUREMENT,
 )
 from .. import (
     lgap_ns,
@@ -17,6 +20,7 @@ LGAP_HVAC_Climate = lgap_ns.class_("LGAPHVACClimate", cg.Component, climate.Clim
 
 CONF_ZONE_NUMBER = "zone"
 CONF_TEMPERATURE_PUBISH_TIME = "temperature_publish_time"
+CONF_POWER_SENSOR = "power_sensor"
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
@@ -24,6 +28,12 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.GenerateID(CONF_LGAP_ID): cv.use_id(LGAP),
         cv.Optional(CONF_ZONE_NUMBER, default=0): cv.All(cv.int_),
         cv.Optional(CONF_TEMPERATURE_PUBISH_TIME, default="300000ms"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_POWER_SENSOR): sensor.sensor_schema(
+            unit_of_measurement=UNIT_KILOWATT,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_POWER,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -43,4 +53,9 @@ async def to_code(config):
     #set properties of the climate component
     cg.add(var.set_zone_number(config[CONF_ZONE_NUMBER]))
     cg.add(var.set_temperature_publish_time(config[CONF_TEMPERATURE_PUBISH_TIME]))
+    
+    #set power sensor if configured
+    if CONF_POWER_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_POWER_SENSOR])
+        cg.add(var.set_power_sensor(sens))
     
