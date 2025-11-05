@@ -279,9 +279,10 @@ namespace esphome
         for (auto &device : this->devices_)
         {
           auto *climate_device = static_cast<LGAPHVACClimate *>(device);
-          if (climate_device->power_sensor_ != nullptr)
+          auto *power_sensor = climate_device->get_power_sensor();
+          if (power_sensor != nullptr)
           {
-            climate_device->power_sensor_->publish_state(0.0);
+            power_sensor->publish_state(0.0);
           }
         }
         return;
@@ -321,8 +322,9 @@ namespace esphome
       for (size_t i = 0; i < active_devices.size(); i++)
       {
         auto *climate_device = static_cast<LGAPHVACClimate *>(active_devices[i]);
+        auto *power_sensor = climate_device->get_power_sensor();
         
-        if (climate_device->power_sensor_ != nullptr)
+        if (power_sensor != nullptr)
         {
           float zone_share = (float)active_zone_loads[i] / (float)sum_loads;
           float zone_kw = zone_share * total_kw;
@@ -330,7 +332,7 @@ namespace esphome
           ESP_LOGV(TAG, "Zone %d power: %.2f kW (%.1f%% of total)", 
                    climate_device->zone_number, zone_kw, zone_share * 100.0);
           
-          climate_device->power_sensor_->publish_state(zone_kw);
+          power_sensor->publish_state(zone_kw);
         }
       }
 
@@ -338,10 +340,11 @@ namespace esphome
       for (auto &device : this->devices_)
       {
         auto *climate_device = static_cast<LGAPHVACClimate *>(device);
+        auto *power_sensor = climate_device->get_power_sensor();
         
-        if (!climate_device->is_unit_on() && climate_device->power_sensor_ != nullptr)
+        if (!climate_device->is_unit_on() && power_sensor != nullptr)
         {
-          climate_device->power_sensor_->publish_state(0.0);
+          power_sensor->publish_state(0.0);
         }
       }
     }

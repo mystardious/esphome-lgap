@@ -21,6 +21,7 @@ namespace esphome
         // Public accessors for power calculation
         uint8_t get_load_byte() const { return this->load_byte_; }
         bool is_unit_on() const { return this->power_state_ == 1; }
+        sensor::Sensor *get_power_sensor() const { return this->power_sensor_; }
 
 
       protected:
