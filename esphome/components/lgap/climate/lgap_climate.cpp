@@ -224,10 +224,10 @@ namespace esphome
       int write_state = this->write_update_pending ? 2 : 0;
 
       // build payload in message buffer
-      message.push_back(0);
-      message.push_back(0);
-      message.push_back(request_id);
-      message.push_back(this->zone_number);
+      message.push_back(this->parent_->get_tx_byte_0());  // Byte 0 - configurable
+      message.push_back(0);                                // Byte 1 - always 0
+      message.push_back(request_id);                       // Byte 2 - request ID
+      message.push_back(this->zone_number);                // Byte 3 - zone number
       message.push_back(write_state | this->power_state_);
       message.push_back(this->mode_ | (this->swing_ << 3) | (this->fan_speed_ << 4));
       message.push_back((uint8_t)(this->target_temperature_ - 15));

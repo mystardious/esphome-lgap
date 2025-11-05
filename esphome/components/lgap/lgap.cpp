@@ -29,6 +29,7 @@ namespace esphome
 
       ESP_LOGCONFIG(TAG, "  Loop wait time: %dms", this->loop_wait_time_);
       ESP_LOGCONFIG(TAG, "  Receive wait time: %dms", this->receive_wait_time_);
+      ESP_LOGCONFIG(TAG, "  TX Byte 0: 0x%02X", this->tx_byte_0_);
       ESP_LOGCONFIG(TAG, "  Child devices: %d", this->devices_.size());
       ESP_LOGCONFIG(TAG, "  Cooling max power: %.2f kW", this->cooling_max_power_);
       ESP_LOGCONFIG(TAG, "  Heating max power: %.2f kW", this->heating_max_power_);
