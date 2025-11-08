@@ -3,6 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import climate, sensor
 from esphome.const import (
     CONF_ID,
+    CONF_NAME,
     UNIT_KILOWATT,
     DEVICE_CLASS_POWER,
     STATE_CLASS_MEASUREMENT,
@@ -21,6 +22,7 @@ LGAP_HVAC_Climate = lgap_ns.class_("LGAPHVACClimate", cg.Component, climate.Clim
 CONF_ZONE_NUMBER = "zone"
 CONF_TEMPERATURE_PUBISH_TIME = "temperature_publish_time"
 CONF_POWER_SENSOR = "power_sensor"
+CONF_LOAD_BYTE_SENSOR = "load_byte_sensor"
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
@@ -32,6 +34,10 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
             unit_of_measurement=UNIT_KILOWATT,
             accuracy_decimals=2,
             device_class=DEVICE_CLASS_POWER,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_LOAD_BYTE_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
     }
@@ -54,8 +60,45 @@ async def to_code(config):
     cg.add(var.set_zone_number(config[CONF_ZONE_NUMBER]))
     cg.add(var.set_temperature_publish_time(config[CONF_TEMPERATURE_PUBISH_TIME]))
     
-    #set power sensor if configured
+    #set power sensor - auto-generate name if not explicitly configured
     if CONF_POWER_SENSOR in config:
         sens = await sensor.new_sensor(config[CONF_POWER_SENSOR])
         cg.add(var.set_power_sensor(sens))
+    else:
+        # Auto-generate power sensor with name based on climate entity
+        from esphome.core import ID
+        power_id = ID(f"{config[CONF_ID].id}_power", is_manual=False, type=sensor.Sensor)
+        power_config = {
+            "unit_of_measurement": UNIT_KILOWATT,
+            "accuracy_decimals": 2,
+            "device_class": DEVICE_CLASS_POWER,
+            "state_class": STATE_CLASS_MEASUREMENT,
+        }
+        # If climate has a name, use it to generate the sensor name
+        if CONF_NAME in config:
+            power_config[CONF_NAME] = f"{config[CONF_NAME]} Power"
+        
+        sens = cg.new_Pvariable(power_id)
+        await sensor.register_sensor(sens, power_config)
+        cg.add(var.set_power_sensor(sens))
+    
+    #set load byte sensor - auto-generate name if not explicitly configured
+    if CONF_LOAD_BYTE_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_LOAD_BYTE_SENSOR])
+        cg.add(var.set_load_byte_sensor(sens))
+    else:
+        # Auto-generate load byte sensor with name based on climate entity
+        from esphome.core import ID
+        load_byte_id = ID(f"{config[CONF_ID].id}_load_byte", is_manual=False, type=sensor.Sensor)
+        load_byte_config = {
+            "accuracy_decimals": 0,
+            "state_class": STATE_CLASS_MEASUREMENT,
+        }
+        # If climate has a name, use it to generate the sensor name
+        if CONF_NAME in config:
+            load_byte_config[CONF_NAME] = f"{config[CONF_NAME]} Load Byte"
+        
+        sens = cg.new_Pvariable(load_byte_id)
+        await sensor.register_sensor(sens, load_byte_config)
+        cg.add(var.set_load_byte_sensor(sens))
     

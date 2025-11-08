@@ -383,6 +383,13 @@ namespace esphome
       {
         ESP_LOGD(TAG, "Load byte changed: %d -> %d", this->load_byte_, load_byte);
         this->load_byte_ = load_byte;
+        
+        // Publish load byte to sensor (always shows value whether unit is on or off)
+        if (this->load_byte_sensor_ != nullptr)
+        {
+          this->load_byte_sensor_->publish_state(load_byte);
+        }
+        
         // Trigger power recalculation in parent
         if (this->parent_ != nullptr)
         {
