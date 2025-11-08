@@ -254,109 +254,115 @@ namespace esphome
       uint8_t power_state = (message[1] & 1);
       uint8_t mode = (message[6] & 7);
 
-      // power state and mode
-      // home assistant climate treats them as a single entity
-      // this logic combines them from lgap into a single entity
-      if (power_state != this->power_state_ || mode != this->mode_)
+      // Don't update control state from device while a write command is pending
+      // This prevents the device's old state from overwriting the user's new command
+      // But we still want to update measurement data (temp, load byte) below
+      if (!this->write_update_pending)
       {
-        // handle mode
-        if (mode == 0)
+        // power state and mode
+        // home assistant climate treats them as a single entity
+        // this logic combines them from lgap into a single entity
+        if (power_state != this->power_state_ || mode != this->mode_)
         {
-          this->mode = climate::CLIMATE_MODE_COOL;
-        }
-        else if (mode == 1)
-        {
-          this->mode = climate::CLIMATE_MODE_DRY;
-        }
-        else if (mode == 2)
-        {
-          this->mode = climate::CLIMATE_MODE_FAN_ONLY;
-        }
-        else if (mode == 3)
-        {
-          // heat/cool is essentially auto
-          this->mode = climate::CLIMATE_MODE_HEAT_COOL;
-        }
-        else if (mode == 4)
-        {
-          this->mode = climate::CLIMATE_MODE_HEAT;
-        }
-        else
-        {
-          ESP_LOGE(TAG, "Invalid mode received: %d", mode);
-          this->mode = climate::CLIMATE_MODE_OFF;
+          // handle mode
+          if (mode == 0)
+          {
+            this->mode = climate::CLIMATE_MODE_COOL;
+          }
+          else if (mode == 1)
+          {
+            this->mode = climate::CLIMATE_MODE_DRY;
+          }
+          else if (mode == 2)
+          {
+            this->mode = climate::CLIMATE_MODE_FAN_ONLY;
+          }
+          else if (mode == 3)
+          {
+            // heat/cool is essentially auto
+            this->mode = climate::CLIMATE_MODE_HEAT_COOL;
+          }
+          else if (mode == 4)
+          {
+            this->mode = climate::CLIMATE_MODE_HEAT;
+          }
+          else
+          {
+            ESP_LOGE(TAG, "Invalid mode received: %d", mode);
+            this->mode = climate::CLIMATE_MODE_OFF;
+          }
+
+          // handle power state
+          if (power_state == 0)
+          {
+            this->mode = climate::CLIMATE_MODE_OFF;
+          }
+
+          // update state
+          publish_update = true;
+          this->mode_ = mode;
+          this->power_state_ = power_state;
         }
 
-        // handle power state
-        if (power_state == 0)
+        // swing options
+        uint8_t swing = (message[6] >> 3) & 1;
+        if (swing != this->swing_)
         {
-          this->mode = climate::CLIMATE_MODE_OFF;
+          if (swing == 0)
+          {
+            this->swing_mode = climate::CLIMATE_SWING_OFF;
+          }
+          else if (swing == 1)
+          {
+            this->swing_mode = climate::CLIMATE_SWING_VERTICAL;
+          }
+          else
+          {
+            ESP_LOGE(TAG, "Invalid swing received: %d", swing);
+          }
+
+          // update state
+          this->swing_ = swing;
+          publish_update = true;
         }
 
-        // update state
-        publish_update = true;
-        this->mode_ = mode;
-        this->power_state_ = power_state;
-      }
+        // fan speed
+        uint8_t fan_speed = ((message[6] >> 4) & 7);
+        if (fan_speed != this->fan_speed_)
+        {
+          if (fan_speed == 0)
+          {
+            this->fan_mode = climate::CLIMATE_FAN_LOW;
+          }
+          else if (fan_speed == 1)
+          {
+            this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
+          }
+          else if (fan_speed == 2)
+          {
+            this->fan_mode = climate::CLIMATE_FAN_HIGH;
+          }
+          else
+          {
+            ESP_LOGE(TAG, "Invalid fan speed received: %d", fan_speed);
+          }
 
-      // swing options
-      uint8_t swing = (message[6] >> 3) & 1;
-      if (swing != this->swing_)
-      {
-        if (swing == 0)
-        {
-          this->swing_mode = climate::CLIMATE_SWING_OFF;
-        }
-        else if (swing == 1)
-        {
-          this->swing_mode = climate::CLIMATE_SWING_VERTICAL;
-        }
-        else
-        {
-          ESP_LOGE(TAG, "Invalid swing received: %d", swing);
-        }
-
-        // update state
-        this->swing_ = swing;
-        publish_update = true;
-      }
-
-      // fan speed
-      uint8_t fan_speed = ((message[6] >> 4) & 7);
-      if (fan_speed != this->fan_speed_)
-      {
-        if (fan_speed == 0)
-        {
-          this->fan_mode = climate::CLIMATE_FAN_LOW;
-        }
-        else if (fan_speed == 1)
-        {
-          this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
-        }
-        else if (fan_speed == 2)
-        {
-          this->fan_mode = climate::CLIMATE_FAN_HIGH;
-        }
-        else
-        {
-          ESP_LOGE(TAG, "Invalid fan speed received: %d", fan_speed);
+          // update state
+          this->fan_speed_ = fan_speed;
+          publish_update = true;
         }
 
-        // update state
-        this->fan_speed_ = fan_speed;
-        publish_update = true;
-      }
+        // target temp
+        int target_temperature = (message[7] & 0xf) + 15;
+        if (target_temperature != this->target_temperature_)
+        {
+          this->target_temperature_ = target_temperature;
+          this->target_temperature = target_temperature;
+          publish_update = true;
+        }
+      } // end of control state update block (write_update_pending check)
 
-      // target temp
-      int target_temperature = (message[7] & 0xf) + 15;
-      if (target_temperature != this->target_temperature_)
-      {
-        this->target_temperature_ = target_temperature;
-        this->target_temperature = target_temperature;
-        publish_update = true;
-      }
-
-      // current temp
+      // current temp - always update measurement data
       // TODO: implement precision setting for reported temperature
       // int current_temperature = ((70 - message[8] * 100.0 / 256.0)) / 100.0;
       int current_temperature = (message[8] & 0xf) + 15;
