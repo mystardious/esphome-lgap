@@ -65,18 +65,26 @@ async def to_code(config):
         sens = await sensor.new_sensor(config[CONF_POWER_SENSOR])
         cg.add(var.set_power_sensor(sens))
     else:
-        # Auto-generate power sensor with name based on climate entity
+        # Auto-generate power sensor based on climate ID and name
         from esphome.core import ID
-        power_id = ID(f"{config[CONF_ID].id}_power", is_manual=False, type=sensor.Sensor)
+        climate_id = config[CONF_ID].id
+        power_id = ID(f"{climate_id}_power", is_manual=False, type=sensor.Sensor)
+        
+        # Use climate name if available, otherwise derive from ID
+        if CONF_NAME in config:
+            sensor_name = f"{config[CONF_NAME]} Power"
+        else:
+            # Convert ID to human-readable name (e.g., "zone_0_climate" -> "Zone 0 Climate Power")
+            friendly_name = climate_id.replace("_", " ").title()
+            sensor_name = f"{friendly_name} Power"
+        
         power_config = {
+            CONF_NAME: sensor_name,
             "unit_of_measurement": UNIT_KILOWATT,
             "accuracy_decimals": 2,
             "device_class": DEVICE_CLASS_POWER,
             "state_class": STATE_CLASS_MEASUREMENT,
         }
-        # If climate has a name, use it to generate the sensor name
-        if CONF_NAME in config:
-            power_config[CONF_NAME] = f"{config[CONF_NAME]} Power"
         
         sens = cg.new_Pvariable(power_id)
         await sensor.register_sensor(sens, power_config)
@@ -87,16 +95,24 @@ async def to_code(config):
         sens = await sensor.new_sensor(config[CONF_LOAD_BYTE_SENSOR])
         cg.add(var.set_load_byte_sensor(sens))
     else:
-        # Auto-generate load byte sensor with name based on climate entity
+        # Auto-generate load byte sensor based on climate ID and name
         from esphome.core import ID
-        load_byte_id = ID(f"{config[CONF_ID].id}_load_byte", is_manual=False, type=sensor.Sensor)
+        climate_id = config[CONF_ID].id
+        load_byte_id = ID(f"{climate_id}_load_byte", is_manual=False, type=sensor.Sensor)
+        
+        # Use climate name if available, otherwise derive from ID
+        if CONF_NAME in config:
+            sensor_name = f"{config[CONF_NAME]} Load Byte"
+        else:
+            # Convert ID to human-readable name (e.g., "zone_0_climate" -> "Zone 0 Climate Load Byte")
+            friendly_name = climate_id.replace("_", " ").title()
+            sensor_name = f"{friendly_name} Load Byte"
+        
         load_byte_config = {
+            CONF_NAME: sensor_name,
             "accuracy_decimals": 0,
             "state_class": STATE_CLASS_MEASUREMENT,
         }
-        # If climate has a name, use it to generate the sensor name
-        if CONF_NAME in config:
-            load_byte_config[CONF_NAME] = f"{config[CONF_NAME]} Load Byte"
         
         sens = cg.new_Pvariable(load_byte_id)
         await sensor.register_sensor(sens, load_byte_config)

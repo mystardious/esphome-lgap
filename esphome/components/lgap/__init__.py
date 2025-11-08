@@ -77,25 +77,22 @@ async def to_code(config):
     cg.add(var.set_heating_max_power(config[CONF_HEATING_MAX_POWER]))
     cg.add(var.set_power_multiplier(config[CONF_POWER_MULTIPLIER]))
     
-    #total power sensor - auto-generate name if not explicitly configured
+    #total power sensor - auto-generate if not explicitly configured
     if CONF_TOTAL_POWER_SENSOR in config:
         sens = await sensor.new_sensor(config[CONF_TOTAL_POWER_SENSOR])
         cg.add(var.set_total_power_sensor(sens))
     else:
-        # Auto-generate total power sensor with name based on LGAP component
+        # Auto-generate total power sensor with simple name
         from esphome.core import ID
-        total_power_id = ID(f"{config[CONF_ID].id}_total_power", is_manual=False, type=sensor.Sensor)
+        lgap_id = config[CONF_ID].id
+        total_power_id = ID(f"{lgap_id}_total_power", is_manual=False, type=sensor.Sensor)
         total_power_config = {
+            CONF_NAME: "Total System Power",
             "unit_of_measurement": UNIT_KILOWATT,
             "accuracy_decimals": 2,
             "device_class": DEVICE_CLASS_POWER,
             "state_class": STATE_CLASS_MEASUREMENT,
         }
-        # If LGAP has a name, use it to generate the sensor name
-        if CONF_NAME in config:
-            total_power_config[CONF_NAME] = f"{config[CONF_NAME]} Total Power"
-        else:
-            total_power_config[CONF_NAME] = "LGAP Total Power"
         
         sens = cg.new_Pvariable(total_power_id)
         await sensor.register_sensor(sens, total_power_config)
