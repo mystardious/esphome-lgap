@@ -87,6 +87,7 @@ async def to_code(config):
         lgap_id = config[CONF_ID].id
         total_power_id = ID(f"{lgap_id}_total_power", is_manual=False, type=sensor.Sensor)
         total_power_config = {
+            CONF_ID: total_power_id,
             CONF_NAME: "Total System Power",
             "unit_of_measurement": UNIT_KILOWATT,
             "accuracy_decimals": 2,

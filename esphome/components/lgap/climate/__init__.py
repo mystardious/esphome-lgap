@@ -79,6 +79,7 @@ async def to_code(config):
             sensor_name = f"{friendly_name} Power"
         
         power_config = {
+            CONF_ID: power_id,
             CONF_NAME: sensor_name,
             "unit_of_measurement": UNIT_KILOWATT,
             "accuracy_decimals": 2,
@@ -109,6 +110,7 @@ async def to_code(config):
             sensor_name = f"{friendly_name} Load Byte"
         
         load_byte_config = {
+            CONF_ID: load_byte_id,
             CONF_NAME: sensor_name,
             "accuracy_decimals": 0,
             "state_class": STATE_CLASS_MEASUREMENT,
