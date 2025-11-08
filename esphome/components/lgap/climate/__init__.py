@@ -78,17 +78,19 @@ async def to_code(config):
             friendly_name = climate_id.replace("_", " ").title()
             sensor_name = f"{friendly_name} Power"
         
-        power_config = {
+        # Build and validate config using sensor_schema to get all defaults
+        sensor_config_schema = sensor.sensor_schema(
+            unit_of_measurement=UNIT_KILOWATT,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_POWER,
+            state_class=STATE_CLASS_MEASUREMENT,
+        )
+        power_config = sensor_config_schema({
             CONF_ID: power_id,
             CONF_NAME: sensor_name,
-            "unit_of_measurement": UNIT_KILOWATT,
-            "accuracy_decimals": 2,
-            "device_class": DEVICE_CLASS_POWER,
-            "state_class": STATE_CLASS_MEASUREMENT,
-        }
+        })
         
-        sens = cg.new_Pvariable(power_id)
-        await sensor.register_sensor(sens, power_config)
+        sens = await sensor.new_sensor(power_config)
         cg.add(var.set_power_sensor(sens))
     
     #set load byte sensor - auto-generate name if not explicitly configured
@@ -109,14 +111,16 @@ async def to_code(config):
             friendly_name = climate_id.replace("_", " ").title()
             sensor_name = f"{friendly_name} Load Byte"
         
-        load_byte_config = {
+        # Build and validate config using sensor_schema to get all defaults
+        sensor_config_schema = sensor.sensor_schema(
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        )
+        load_byte_config = sensor_config_schema({
             CONF_ID: load_byte_id,
             CONF_NAME: sensor_name,
-            "accuracy_decimals": 0,
-            "state_class": STATE_CLASS_MEASUREMENT,
-        }
+        })
         
-        sens = cg.new_Pvariable(load_byte_id)
-        await sensor.register_sensor(sens, load_byte_config)
+        sens = await sensor.new_sensor(load_byte_config)
         cg.add(var.set_load_byte_sensor(sens))
     

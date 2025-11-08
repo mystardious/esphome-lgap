@@ -86,15 +86,18 @@ async def to_code(config):
         from esphome.core import ID
         lgap_id = config[CONF_ID].id
         total_power_id = ID(f"{lgap_id}_total_power", is_manual=False, type=sensor.Sensor)
-        total_power_config = {
+        
+        # Build and validate config using sensor_schema to get all defaults
+        sensor_config_schema = sensor.sensor_schema(
+            unit_of_measurement=UNIT_KILOWATT,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_POWER,
+            state_class=STATE_CLASS_MEASUREMENT,
+        )
+        total_power_config = sensor_config_schema({
             CONF_ID: total_power_id,
             CONF_NAME: "Total System Power",
-            "unit_of_measurement": UNIT_KILOWATT,
-            "accuracy_decimals": 2,
-            "device_class": DEVICE_CLASS_POWER,
-            "state_class": STATE_CLASS_MEASUREMENT,
-        }
+        })
         
-        sens = cg.new_Pvariable(total_power_id)
-        await sensor.register_sensor(sens, total_power_config)
+        sens = await sensor.new_sensor(total_power_config)
         cg.add(var.set_total_power_sensor(sens))
