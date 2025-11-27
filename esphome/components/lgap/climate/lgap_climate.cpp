@@ -411,9 +411,15 @@ namespace esphome
       // checks that temperature is different AND that the publish time interval has passed
       if (current_temperature != this->current_temperature_)
       {
-        if (this->temperature_last_publish_time_ + this->temperature_publish_time_ <= millis())
+        // Publish immediately on first reading (temperature_last_publish_time_ == 0)
+        // or after the configured time interval has elapsed
+        bool is_first_reading = (this->temperature_last_publish_time_ == 0);
+        bool interval_elapsed = (this->temperature_last_publish_time_ + this->temperature_publish_time_ <= millis());
+        
+        if (is_first_reading || interval_elapsed)
         {
-          ESP_LOGD(TAG, "Temperature update time has lapsed. Sending update...");
+          ESP_LOGD(TAG, "Temperature update - %s. Sending update...", 
+                   is_first_reading ? "first reading" : "time interval elapsed");
           this->temperature_last_publish_time_ = millis();
           this->current_temperature_ = current_temperature;
           this->current_temperature = current_temperature;
