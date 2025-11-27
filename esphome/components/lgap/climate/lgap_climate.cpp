@@ -453,91 +453,80 @@ namespace esphome
       ESP_LOGD(TAG, "Pipe temps - In: %.1f°C (raw: %d), Out: %.1f°C (raw: %d)", 
                pipe_in_temp_c, raw_pipe_in, pipe_out_temp_c, raw_pipe_out);
 
-      // Track protocol bytes for analysis and load calculation
+      // LG LGAP Protocol - LonWorks-aligned load management bytes
+      // These bytes match LG's PI485→LonWorks gateway mappings used in commercial BMS
+      // 
       // Message structure (16 bytes):
       //   0: 0x10 (frame marker)
       //   1: power state + flags
       //   2: request ID
-      //   3: UNKNOWN - tracking for analysis
+      //   3: (reserved/unknown)
       //   4: zone number
-      //   5: UNKNOWN - tracking for analysis
+      //   5: (reserved/unknown)
       //   6: mode + swing + fan
       //   7: target temp
       //   8: room temp
       //   9: pipe-in temp
       //   10: pipe-out temp
-      //   11: UNKNOWN - possibly load byte, tracking for analysis
-      //   12: UNKNOWN - tracking for analysis
-      //   13: Zone Load Index - fixed design load weight for this IDU/zone
-      //   14: ODU Active Load - sum of byte 13 for all zones currently ON on this ODU
+      //   11: Zone Active Load (LonWorks: nvoLoadEstimate/nvoUnitLoad)
+      //   12: Zone Power State (LonWorks: nvoOnOff) - 0=ON, 1=OFF
+      //   13: Zone Design Load (LonWorks: nciRatedCapacity) - fixed design weight
+      //   14: ODU Total Load (LonWorks: nvoThermalLoad) - compressor load
       //   15: checksum
       
-      if (this->unknown_byte_3_sensor_ != nullptr)
+      // Byte 11: Zone Active Load (LonWorks: nvoLoadEstimate / nvoUnitLoad)
+      // Dynamic real-time per-zone thermal load estimate
+      // - Rises when zone is calling for cooling/heating
+      // - Falls as zone approaches setpoint
+      // - Goes to zero when zone is idle/off
+      // - Proportional to design load but affected by temp delta & demand
+      // - Scales with rated capacity: design_load × demand_factor
+      uint8_t zone_active_load = message[11];
+      if (this->zone_active_load_sensor_ != nullptr)
       {
-        this->unknown_byte_3_sensor_->publish_state(message[3]);
+        this->zone_active_load_sensor_->publish_state(zone_active_load);
       }
       
-      if (this->unknown_byte_5_sensor_ != nullptr)
+      // Byte 12: Zone Power State (LonWorks: nvoOnOff)
+      // Simple ON/OFF state with IDU-level granularity
+      // - 0 = ON
+      // - 1 = OFF
+      // - May jitter during state transitions (ON→OFF→ON) as different boards report at different times
+      // - Multiple indoor sub-zones may share the same IDU-level ON/OFF state
+      uint8_t zone_power_state = message[12];
+      if (this->zone_power_state_sensor_ != nullptr)
       {
-        this->unknown_byte_5_sensor_->publish_state(message[5]);
+        this->zone_power_state_sensor_->publish_state(zone_power_state);
       }
       
-      if (this->unknown_byte_11_sensor_ != nullptr)
-      {
-        this->unknown_byte_11_sensor_->publish_state(message[11]);
-      }
-      
-      if (this->unknown_byte_12_sensor_ != nullptr)
-      {
-        this->unknown_byte_12_sensor_->publish_state(message[12]);
-      }
-      
-      // Byte 13: Zone Load Index
-      // Fixed design load weight for this IDU on its ODU
-      // Does not change with on/off state
-      // Proportional to duct size / airflow capacity
+      // Byte 13: Zone Design Load Index (LonWorks: nciRatedCapacity)
+      // Fixed design load weight representing the rated capacity of this IDU
+      // - Does NOT change with on/off state
+      // - Proportional to duct size / airflow potential / nominal cooling capacity
+      // - Used by BMS to model expected capacity split among zones
       // Example values: Small rooms: 9, Medium: 12, Large: 24
-      uint8_t zone_load_index = message[13];
-      if (this->zone_load_index_sensor_ != nullptr)
+      uint8_t zone_design_load = message[13];
+      if (this->zone_design_load_sensor_ != nullptr)
       {
-        this->zone_load_index_sensor_->publish_state(zone_load_index);
+        this->zone_design_load_sensor_->publish_state(zone_design_load);
       }
       
-      // Byte 14: ODU Active Load
-      // Sum of zone_load_index (byte 13) for all zones currently ON on this ODU
-      // Same value reported to all IDUs connected to the same ODU
-      // Use (byte14 / sum_of_all_zone_indices) to calculate ODU load percentage
-      // Example: If all zones total to 78, and byte14=36, ODU is at 46% load
-      uint8_t odu_active_load = message[14];
-      if (this->odu_active_load_sensor_ != nullptr)
+      // Byte 14: ODU Total Load (LonWorks: nvoThermalLoad / nvoOduLoadFactor)
+      // ODU-level compressor load estimate - sum of active loads across all zones
+      // - Same value reported to all IDUs connected to the same ODU
+      // - Increases with number of active zones
+      // - Max load = sum of rated loads of connected zones
+      // - Goes to 0 when all zones are off
+      // Use (byte14 / sum_of_all_design_loads) to calculate ODU load percentage
+      // Example: All 5 downstairs zones total 78 (9+9+12+24+24), if byte14=36 → ODU at 46% load
+      uint8_t odu_total_load = message[14];
+      if (this->odu_total_load_sensor_ != nullptr)
       {
-        this->odu_active_load_sensor_->publish_state(odu_active_load);
+        this->odu_total_load_sensor_->publish_state(odu_total_load);
       }
       
-      ESP_LOGD(TAG, "Load indices - Zone: %d, ODU Active: %d", zone_load_index, odu_active_load);
-
-      // Extract load/operation byte (Byte 11 in the response, NOT Byte 10!)
-      // Note: Byte 10 is pipe-out temp, load byte is actually at a different position
-      // This byte represents the unit's operation rate/load (0-255)
-      // TODO: Verify the correct byte position for load_byte in the 16-byte frame
-      uint8_t load_byte = message[11];  // Changed from message[10] to avoid conflict with pipe_out
-      if (load_byte != this->load_byte_)
-      {
-        ESP_LOGD(TAG, "Load byte changed: %d -> %d", this->load_byte_, load_byte);
-        this->load_byte_ = load_byte;
-        
-        // Publish load byte to sensor (always shows value whether unit is on or off)
-        if (this->load_byte_sensor_ != nullptr)
-        {
-          this->load_byte_sensor_->publish_state(load_byte);
-        }
-        
-        // Trigger power recalculation in parent
-        if (this->parent_ != nullptr)
-        {
-          this->parent_->calculate_and_publish_power();
-        }
-      }
+      ESP_LOGD(TAG, "LonWorks Load - Active: %d, Power: %d, Design: %d, ODU: %d", 
+               zone_active_load, zone_power_state, zone_design_load, odu_total_load);
 
       // send update to home assistant with all the changed variables
       if (publish_update == true)

@@ -14,23 +14,15 @@ namespace esphome
         void dump_config() override;       
         void setup() override;
         void set_temperature_publish_time(int temperature_publish_time) { this->temperature_publish_time_ = temperature_publish_time; }
-        void set_power_sensor(sensor::Sensor *sensor) { this->power_sensor_ = sensor; }
-        void set_load_byte_sensor(sensor::Sensor *sensor) { this->load_byte_sensor_ = sensor; }
         void set_pipe_in_sensor(sensor::Sensor *sensor) { this->pipe_in_sensor_ = sensor; }
         void set_pipe_out_sensor(sensor::Sensor *sensor) { this->pipe_out_sensor_ = sensor; }
-        void set_unknown_byte_3_sensor(sensor::Sensor *sensor) { this->unknown_byte_3_sensor_ = sensor; }
-        void set_unknown_byte_5_sensor(sensor::Sensor *sensor) { this->unknown_byte_5_sensor_ = sensor; }
-        void set_unknown_byte_11_sensor(sensor::Sensor *sensor) { this->unknown_byte_11_sensor_ = sensor; }
-        void set_unknown_byte_12_sensor(sensor::Sensor *sensor) { this->unknown_byte_12_sensor_ = sensor; }
-        void set_zone_load_index_sensor(sensor::Sensor *sensor) { this->zone_load_index_sensor_ = sensor; }
-        void set_odu_active_load_sensor(sensor::Sensor *sensor) { this->odu_active_load_sensor_ = sensor; }
+        void set_zone_active_load_sensor(sensor::Sensor *sensor) { this->zone_active_load_sensor_ = sensor; }
+        void set_zone_power_state_sensor(sensor::Sensor *sensor) { this->zone_power_state_sensor_ = sensor; }
+        void set_zone_design_load_sensor(sensor::Sensor *sensor) { this->zone_design_load_sensor_ = sensor; }
+        void set_odu_total_load_sensor(sensor::Sensor *sensor) { this->odu_total_load_sensor_ = sensor; }
         virtual esphome::climate::ClimateTraits traits() override;
         virtual void control(const esphome::climate::ClimateCall &call) override;
         
-        // Public accessors for power calculation
-        uint8_t get_load_byte() const { return this->load_byte_; }
-        bool is_unit_on() const { return this->power_state_ == 1; }
-        sensor::Sensor *get_power_sensor() const { return this->power_sensor_; }
 
 
       protected:
@@ -40,22 +32,17 @@ namespace esphome
         uint8_t power_state_{0};
         uint8_t swing_{0};
         uint8_t mode_{0};
-        uint8_t fan_speed_{0};
-        uint8_t load_byte_{0};  // Byte 10 from response - load/operation rate
+        uint8_t fan_speed_{0}
 
         float current_temperature_{0.0f};
         float target_temperature_{0.0f};
         
-        sensor::Sensor *power_sensor_{nullptr};
-        sensor::Sensor *load_byte_sensor_{nullptr};
         sensor::Sensor *pipe_in_sensor_{nullptr};
         sensor::Sensor *pipe_out_sensor_{nullptr};
-        sensor::Sensor *unknown_byte_3_sensor_{nullptr};
-        sensor::Sensor *unknown_byte_5_sensor_{nullptr};
-        sensor::Sensor *unknown_byte_11_sensor_{nullptr};
-        sensor::Sensor *unknown_byte_12_sensor_{nullptr};
-        sensor::Sensor *zone_load_index_sensor_{nullptr};
-        sensor::Sensor *odu_active_load_sensor_{nullptr};
+        sensor::Sensor *zone_active_load_sensor_{nullptr};      // Byte 11 - LonWorks nvoLoadEstimate
+        sensor::Sensor *zone_power_state_sensor_{nullptr};      // Byte 12 - LonWorks nvoOnOff
+        sensor::Sensor *zone_design_load_sensor_{nullptr};      // Byte 13 - LonWorks nciRatedCapacity
+        sensor::Sensor *odu_total_load_sensor_{nullptr};        // Byte 14 - LonWorks nvoThermalLoad
 
         //todo: evaluate whether to use esppreferenceobject or not
         // ESPPreferenceObject power_state_preference_; //uint8_t
