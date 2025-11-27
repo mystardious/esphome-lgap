@@ -364,8 +364,12 @@ namespace esphome
 
       // current temp - always update measurement data
       // TODO: implement precision setting for reported temperature
-      // int current_temperature = ((70 - message[8] * 100.0 / 256.0)) / 100.0;
-      int current_temperature = (message[8] & 0xf) + 15;
+      // OLD (wrong, uses only low nibble):
+      // int current_temperature = (message[8] & 0xf) + 15;
+      // NEW (from LG table: ~3 counts per °C, offset 192):
+      // Temp(°C) = floor((192 - raw_byte) / 3)
+      uint8_t raw = message[8];
+      int current_temperature = (192 - raw) / 3;  // integer division floors automatically
       ESP_LOGD(TAG, "Current temperature: %d", current_temperature);
       // checks that temperature is different AND that the publish time interval has passed
       if (current_temperature != this->current_temperature_)
