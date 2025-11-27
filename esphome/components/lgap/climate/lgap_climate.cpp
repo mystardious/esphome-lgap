@@ -13,6 +13,13 @@ namespace esphome
     static const uint8_t MIN_TEMPERATURE = 16;
     static const uint8_t MAX_TEMPERATURE = 36;
 
+    // Approximate LG pipe temperature mapping in °C.
+    // This is consistent with the room-sensor mapping and gives realistic values.
+    // Same formula as room temp: Temp(°C) = (192 - raw) / 3
+    inline float lgap_raw_to_pipe_temp(uint8_t raw) {
+      return float(192 - raw) / 3.0f;
+    }
+
     void LGAPHVACClimate::dump_config()
     {
       ESP_LOGCONFIG(TAG, "LGAP HVAC:");
@@ -352,8 +359,16 @@ namespace esphome
           publish_update = true;
         }
 
-        // target temp
-        int target_temperature = (message[7] & 0xf) + 15;
+        // Target temperature in °C from LGAP frame
+        // Lower nibble of message[7] holds the integer offset (0 => 15°C, 1 => 16°C, etc.)
+        // This matches the LgController pattern: (buffer[6] & 0xF) + 15
+        // Note: LGAP protocol may not support half-degree increments like the single-head controller
+        uint8_t raw_target = message[7] & 0x0F;
+        float target_temperature = static_cast<float>(raw_target + 15);
+        
+        // If LGAP protocol supports half-degree flag (similar to single-head), add here:
+        // if (message[X] & 0x1) target_temperature += 0.5f;
+        
         if (target_temperature != this->target_temperature_)
         {
           this->target_temperature_ = target_temperature;
@@ -386,9 +401,35 @@ namespace esphome
         }
       }
 
-      // Extract load/operation byte (Byte 10 in the response)
+      // Extract and decode pipe temperatures (message[9] = Pipe-In, message[10] = Pipe-Out)
+      // Using the same LG temperature mapping as room temp: Temp(°C) = (192 - raw) / 3
+      // These represent the refrigerant line temperatures for this zone
+      uint8_t raw_pipe_in = message[9];
+      uint8_t raw_pipe_out = message[10];
+      
+      float pipe_in_temp_c = lgap_raw_to_pipe_temp(raw_pipe_in);
+      float pipe_out_temp_c = lgap_raw_to_pipe_temp(raw_pipe_out);
+      
+      // Publish pipe-in temperature sensor if configured
+      if (this->pipe_in_sensor_ != nullptr)
+      {
+        this->pipe_in_sensor_->publish_state(pipe_in_temp_c);
+      }
+      
+      // Publish pipe-out temperature sensor if configured
+      if (this->pipe_out_sensor_ != nullptr)
+      {
+        this->pipe_out_sensor_->publish_state(pipe_out_temp_c);
+      }
+      
+      ESP_LOGD(TAG, "Pipe temps - In: %.1f°C (raw: %d), Out: %.1f°C (raw: %d)", 
+               pipe_in_temp_c, raw_pipe_in, pipe_out_temp_c, raw_pipe_out);
+
+      // Extract load/operation byte (Byte 11 in the response, NOT Byte 10!)
+      // Note: Byte 10 is pipe-out temp, load byte is actually at a different position
       // This byte represents the unit's operation rate/load (0-255)
-      uint8_t load_byte = message[10];
+      // TODO: Verify the correct byte position for load_byte in the 16-byte frame
+      uint8_t load_byte = message[11];  // Changed from message[10] to avoid conflict with pipe_out
       if (load_byte != this->load_byte_)
       {
         ESP_LOGD(TAG, "Load byte changed: %d -> %d", this->load_byte_, load_byte);

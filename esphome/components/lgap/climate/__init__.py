@@ -5,7 +5,9 @@ from esphome.const import (
     CONF_ID,
     CONF_NAME,
     UNIT_KILOWATT,
+    UNIT_CELSIUS,
     DEVICE_CLASS_POWER,
+    DEVICE_CLASS_TEMPERATURE,
     STATE_CLASS_MEASUREMENT,
 )
 from .. import (
@@ -23,6 +25,8 @@ CONF_ZONE_NUMBER = "zone"
 CONF_TEMPERATURE_PUBISH_TIME = "temperature_publish_time"
 CONF_POWER_SENSOR = "power_sensor"
 CONF_LOAD_BYTE_SENSOR = "load_byte_sensor"
+CONF_PIPE_IN_SENSOR = "pipe_in_sensor"
+CONF_PIPE_OUT_SENSOR = "pipe_out_sensor"
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
@@ -38,6 +42,18 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         ),
         cv.Optional(CONF_LOAD_BYTE_SENSOR): sensor.sensor_schema(
             accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_PIPE_IN_SENSOR): sensor.sensor_schema(
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_PIPE_OUT_SENSOR): sensor.sensor_schema(
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            device_class=DEVICE_CLASS_TEMPERATURE,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
     }
@@ -123,4 +139,70 @@ async def to_code(config):
         
         sens = await sensor.new_sensor(load_byte_config)
         cg.add(var.set_load_byte_sensor(sens))
+    
+    # Set pipe-in temperature sensor - auto-generate name if not explicitly configured
+    if CONF_PIPE_IN_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_PIPE_IN_SENSOR])
+        cg.add(var.set_pipe_in_sensor(sens))
+    else:
+        # Auto-generate pipe-in sensor based on climate ID and name
+        from esphome.core import ID
+        climate_id = config[CONF_ID].id
+        pipe_in_id = ID(f"{climate_id}_pipe_in", is_manual=False, type=sensor.Sensor)
+        
+        # Use climate name if available, otherwise derive from ID
+        if CONF_NAME in config:
+            sensor_name = f"{config[CONF_NAME]} Pipe In"
+        else:
+            # Convert ID to human-readable name
+            friendly_name = climate_id.replace("_", " ").title()
+            sensor_name = f"{friendly_name} Pipe In"
+        
+        # Build and validate config using sensor_schema to get all defaults
+        sensor_config_schema = sensor.sensor_schema(
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        )
+        pipe_in_config = sensor_config_schema({
+            CONF_ID: pipe_in_id,
+            CONF_NAME: sensor_name,
+        })
+        
+        sens = await sensor.new_sensor(pipe_in_config)
+        cg.add(var.set_pipe_in_sensor(sens))
+    
+    # Set pipe-out temperature sensor - auto-generate name if not explicitly configured
+    if CONF_PIPE_OUT_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_PIPE_OUT_SENSOR])
+        cg.add(var.set_pipe_out_sensor(sens))
+    else:
+        # Auto-generate pipe-out sensor based on climate ID and name
+        from esphome.core import ID
+        climate_id = config[CONF_ID].id
+        pipe_out_id = ID(f"{climate_id}_pipe_out", is_manual=False, type=sensor.Sensor)
+        
+        # Use climate name if available, otherwise derive from ID
+        if CONF_NAME in config:
+            sensor_name = f"{config[CONF_NAME]} Pipe Out"
+        else:
+            # Convert ID to human-readable name
+            friendly_name = climate_id.replace("_", " ").title()
+            sensor_name = f"{friendly_name} Pipe Out"
+        
+        # Build and validate config using sensor_schema to get all defaults
+        sensor_config_schema = sensor.sensor_schema(
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        )
+        pipe_out_config = sensor_config_schema({
+            CONF_ID: pipe_out_id,
+            CONF_NAME: sensor_name,
+        })
+        
+        sens = await sensor.new_sensor(pipe_out_config)
+        cg.add(var.set_pipe_out_sensor(sens))
     

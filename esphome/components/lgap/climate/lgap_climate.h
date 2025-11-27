@@ -16,6 +16,8 @@ namespace esphome
         void set_temperature_publish_time(int temperature_publish_time) { this->temperature_publish_time_ = temperature_publish_time; }
         void set_power_sensor(sensor::Sensor *sensor) { this->power_sensor_ = sensor; }
         void set_load_byte_sensor(sensor::Sensor *sensor) { this->load_byte_sensor_ = sensor; }
+        void set_pipe_in_sensor(sensor::Sensor *sensor) { this->pipe_in_sensor_ = sensor; }
+        void set_pipe_out_sensor(sensor::Sensor *sensor) { this->pipe_out_sensor_ = sensor; }
         virtual esphome::climate::ClimateTraits traits() override;
         virtual void control(const esphome::climate::ClimateCall &call) override;
         
@@ -40,6 +42,8 @@ namespace esphome
         
         sensor::Sensor *power_sensor_{nullptr};
         sensor::Sensor *load_byte_sensor_{nullptr};
+        sensor::Sensor *pipe_in_sensor_{nullptr};
+        sensor::Sensor *pipe_out_sensor_{nullptr};
 
         //todo: evaluate whether to use esppreferenceobject or not
         // ESPPreferenceObject power_state_preference_; //uint8_t
