@@ -453,8 +453,7 @@ namespace esphome
       ESP_LOGD(TAG, "Pipe temps - In: %.1f°C (raw: %d), Out: %.1f°C (raw: %d)", 
                pipe_in_temp_c, raw_pipe_in, pipe_out_temp_c, raw_pipe_out);
 
-      // Track undecoded/unknown bytes for protocol analysis
-      // These sensors allow observation of byte patterns over time
+      // Track protocol bytes for analysis and load calculation
       // Message structure (16 bytes):
       //   0: 0x10 (frame marker)
       //   1: power state + flags
@@ -469,8 +468,8 @@ namespace esphome
       //   10: pipe-out temp
       //   11: UNKNOWN - possibly load byte, tracking for analysis
       //   12: UNKNOWN - tracking for analysis
-      //   13: UNKNOWN - tracking for analysis
-      //   14: UNKNOWN - tracking for analysis
+      //   13: Zone Load Index - fixed design load weight for this IDU/zone
+      //   14: ODU Active Load - sum of byte 13 for all zones currently ON on this ODU
       //   15: checksum
       
       if (this->unknown_byte_3_sensor_ != nullptr)
@@ -493,15 +492,29 @@ namespace esphome
         this->unknown_byte_12_sensor_->publish_state(message[12]);
       }
       
-      if (this->unknown_byte_13_sensor_ != nullptr)
+      // Byte 13: Zone Load Index
+      // Fixed design load weight for this IDU on its ODU
+      // Does not change with on/off state
+      // Proportional to duct size / airflow capacity
+      // Example values: Small rooms: 9, Medium: 12, Large: 24
+      uint8_t zone_load_index = message[13];
+      if (this->zone_load_index_sensor_ != nullptr)
       {
-        this->unknown_byte_13_sensor_->publish_state(message[13]);
+        this->zone_load_index_sensor_->publish_state(zone_load_index);
       }
       
-      if (this->unknown_byte_14_sensor_ != nullptr)
+      // Byte 14: ODU Active Load
+      // Sum of zone_load_index (byte 13) for all zones currently ON on this ODU
+      // Same value reported to all IDUs connected to the same ODU
+      // Use (byte14 / sum_of_all_zone_indices) to calculate ODU load percentage
+      // Example: If all zones total to 78, and byte14=36, ODU is at 46% load
+      uint8_t odu_active_load = message[14];
+      if (this->odu_active_load_sensor_ != nullptr)
       {
-        this->unknown_byte_14_sensor_->publish_state(message[14]);
+        this->odu_active_load_sensor_->publish_state(odu_active_load);
       }
+      
+      ESP_LOGD(TAG, "Load indices - Zone: %d, ODU Active: %d", zone_load_index, odu_active_load);
 
       // Extract load/operation byte (Byte 11 in the response, NOT Byte 10!)
       // Note: Byte 10 is pipe-out temp, load byte is actually at a different position

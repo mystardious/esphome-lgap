@@ -31,8 +31,8 @@ CONF_UNKNOWN_BYTE_3_SENSOR = "unknown_byte_3_sensor"
 CONF_UNKNOWN_BYTE_5_SENSOR = "unknown_byte_5_sensor"
 CONF_UNKNOWN_BYTE_11_SENSOR = "unknown_byte_11_sensor"
 CONF_UNKNOWN_BYTE_12_SENSOR = "unknown_byte_12_sensor"
-CONF_UNKNOWN_BYTE_13_SENSOR = "unknown_byte_13_sensor"
-CONF_UNKNOWN_BYTE_14_SENSOR = "unknown_byte_14_sensor"
+CONF_ZONE_LOAD_INDEX_SENSOR = "zone_load_index_sensor"
+CONF_ODU_ACTIVE_LOAD_SENSOR = "odu_active_load_sensor"
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
@@ -78,11 +78,11 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
-        cv.Optional(CONF_UNKNOWN_BYTE_13_SENSOR): sensor.sensor_schema(
+        cv.Optional(CONF_ZONE_LOAD_INDEX_SENSOR): sensor.sensor_schema(
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
-        cv.Optional(CONF_UNKNOWN_BYTE_14_SENSOR): sensor.sensor_schema(
+        cv.Optional(CONF_ODU_ACTIVE_LOAD_SENSOR): sensor.sensor_schema(
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
@@ -236,15 +236,15 @@ async def to_code(config):
         sens = await sensor.new_sensor(pipe_out_config)
         cg.add(var.set_pipe_out_sensor(sens))
     
-    # Auto-generate unknown byte sensors for protocol analysis
-    # These track undecoded bytes in the 16-byte LGAP message
+    # Auto-generate protocol analysis and load sensors
+    # These track bytes in the 16-byte LGAP message for protocol analysis and load calculation
     unknown_byte_sensors = [
         (CONF_UNKNOWN_BYTE_3_SENSOR, "set_unknown_byte_3_sensor", "byte_3", "Unknown Byte 3"),
         (CONF_UNKNOWN_BYTE_5_SENSOR, "set_unknown_byte_5_sensor", "byte_5", "Unknown Byte 5"),
         (CONF_UNKNOWN_BYTE_11_SENSOR, "set_unknown_byte_11_sensor", "byte_11", "Unknown Byte 11"),
         (CONF_UNKNOWN_BYTE_12_SENSOR, "set_unknown_byte_12_sensor", "byte_12", "Unknown Byte 12"),
-        (CONF_UNKNOWN_BYTE_13_SENSOR, "set_unknown_byte_13_sensor", "byte_13", "Unknown Byte 13"),
-        (CONF_UNKNOWN_BYTE_14_SENSOR, "set_unknown_byte_14_sensor", "byte_14", "Unknown Byte 14"),
+        (CONF_ZONE_LOAD_INDEX_SENSOR, "set_zone_load_index_sensor", "zone_load_index", "Zone Load Index"),
+        (CONF_ODU_ACTIVE_LOAD_SENSOR, "set_odu_active_load_sensor", "odu_active_load", "ODU Active Load"),
     ]
     
     for conf_key, setter_method, id_suffix, name_suffix in unknown_byte_sensors:

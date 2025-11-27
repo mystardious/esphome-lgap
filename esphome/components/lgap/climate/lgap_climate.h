@@ -22,8 +22,8 @@ namespace esphome
         void set_unknown_byte_5_sensor(sensor::Sensor *sensor) { this->unknown_byte_5_sensor_ = sensor; }
         void set_unknown_byte_11_sensor(sensor::Sensor *sensor) { this->unknown_byte_11_sensor_ = sensor; }
         void set_unknown_byte_12_sensor(sensor::Sensor *sensor) { this->unknown_byte_12_sensor_ = sensor; }
-        void set_unknown_byte_13_sensor(sensor::Sensor *sensor) { this->unknown_byte_13_sensor_ = sensor; }
-        void set_unknown_byte_14_sensor(sensor::Sensor *sensor) { this->unknown_byte_14_sensor_ = sensor; }
+        void set_zone_load_index_sensor(sensor::Sensor *sensor) { this->zone_load_index_sensor_ = sensor; }
+        void set_odu_active_load_sensor(sensor::Sensor *sensor) { this->odu_active_load_sensor_ = sensor; }
         virtual esphome::climate::ClimateTraits traits() override;
         virtual void control(const esphome::climate::ClimateCall &call) override;
         
@@ -54,8 +54,8 @@ namespace esphome
         sensor::Sensor *unknown_byte_5_sensor_{nullptr};
         sensor::Sensor *unknown_byte_11_sensor_{nullptr};
         sensor::Sensor *unknown_byte_12_sensor_{nullptr};
-        sensor::Sensor *unknown_byte_13_sensor_{nullptr};
-        sensor::Sensor *unknown_byte_14_sensor_{nullptr};
+        sensor::Sensor *zone_load_index_sensor_{nullptr};
+        sensor::Sensor *odu_active_load_sensor_{nullptr};
 
         //todo: evaluate whether to use esppreferenceobject or not
         // ESPPreferenceObject power_state_preference_; //uint8_t
