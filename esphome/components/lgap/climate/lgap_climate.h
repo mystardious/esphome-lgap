@@ -18,6 +18,12 @@ namespace esphome
         void set_load_byte_sensor(sensor::Sensor *sensor) { this->load_byte_sensor_ = sensor; }
         void set_pipe_in_sensor(sensor::Sensor *sensor) { this->pipe_in_sensor_ = sensor; }
         void set_pipe_out_sensor(sensor::Sensor *sensor) { this->pipe_out_sensor_ = sensor; }
+        void set_unknown_byte_3_sensor(sensor::Sensor *sensor) { this->unknown_byte_3_sensor_ = sensor; }
+        void set_unknown_byte_5_sensor(sensor::Sensor *sensor) { this->unknown_byte_5_sensor_ = sensor; }
+        void set_unknown_byte_11_sensor(sensor::Sensor *sensor) { this->unknown_byte_11_sensor_ = sensor; }
+        void set_unknown_byte_12_sensor(sensor::Sensor *sensor) { this->unknown_byte_12_sensor_ = sensor; }
+        void set_unknown_byte_13_sensor(sensor::Sensor *sensor) { this->unknown_byte_13_sensor_ = sensor; }
+        void set_unknown_byte_14_sensor(sensor::Sensor *sensor) { this->unknown_byte_14_sensor_ = sensor; }
         virtual esphome::climate::ClimateTraits traits() override;
         virtual void control(const esphome::climate::ClimateCall &call) override;
         
@@ -44,6 +50,12 @@ namespace esphome
         sensor::Sensor *load_byte_sensor_{nullptr};
         sensor::Sensor *pipe_in_sensor_{nullptr};
         sensor::Sensor *pipe_out_sensor_{nullptr};
+        sensor::Sensor *unknown_byte_3_sensor_{nullptr};
+        sensor::Sensor *unknown_byte_5_sensor_{nullptr};
+        sensor::Sensor *unknown_byte_11_sensor_{nullptr};
+        sensor::Sensor *unknown_byte_12_sensor_{nullptr};
+        sensor::Sensor *unknown_byte_13_sensor_{nullptr};
+        sensor::Sensor *unknown_byte_14_sensor_{nullptr};
 
         //todo: evaluate whether to use esppreferenceobject or not
         // ESPPreferenceObject power_state_preference_; //uint8_t

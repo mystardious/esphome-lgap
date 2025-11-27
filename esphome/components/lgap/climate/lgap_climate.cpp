@@ -453,6 +453,56 @@ namespace esphome
       ESP_LOGD(TAG, "Pipe temps - In: %.1f°C (raw: %d), Out: %.1f°C (raw: %d)", 
                pipe_in_temp_c, raw_pipe_in, pipe_out_temp_c, raw_pipe_out);
 
+      // Track undecoded/unknown bytes for protocol analysis
+      // These sensors allow observation of byte patterns over time
+      // Message structure (16 bytes):
+      //   0: 0x10 (frame marker)
+      //   1: power state + flags
+      //   2: request ID
+      //   3: UNKNOWN - tracking for analysis
+      //   4: zone number
+      //   5: UNKNOWN - tracking for analysis
+      //   6: mode + swing + fan
+      //   7: target temp
+      //   8: room temp
+      //   9: pipe-in temp
+      //   10: pipe-out temp
+      //   11: UNKNOWN - possibly load byte, tracking for analysis
+      //   12: UNKNOWN - tracking for analysis
+      //   13: UNKNOWN - tracking for analysis
+      //   14: UNKNOWN - tracking for analysis
+      //   15: checksum
+      
+      if (this->unknown_byte_3_sensor_ != nullptr)
+      {
+        this->unknown_byte_3_sensor_->publish_state(message[3]);
+      }
+      
+      if (this->unknown_byte_5_sensor_ != nullptr)
+      {
+        this->unknown_byte_5_sensor_->publish_state(message[5]);
+      }
+      
+      if (this->unknown_byte_11_sensor_ != nullptr)
+      {
+        this->unknown_byte_11_sensor_->publish_state(message[11]);
+      }
+      
+      if (this->unknown_byte_12_sensor_ != nullptr)
+      {
+        this->unknown_byte_12_sensor_->publish_state(message[12]);
+      }
+      
+      if (this->unknown_byte_13_sensor_ != nullptr)
+      {
+        this->unknown_byte_13_sensor_->publish_state(message[13]);
+      }
+      
+      if (this->unknown_byte_14_sensor_ != nullptr)
+      {
+        this->unknown_byte_14_sensor_->publish_state(message[14]);
+      }
+
       // Extract load/operation byte (Byte 11 in the response, NOT Byte 10!)
       // Note: Byte 10 is pipe-out temp, load byte is actually at a different position
       // This byte represents the unit's operation rate/load (0-255)

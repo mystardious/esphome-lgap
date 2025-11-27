@@ -27,6 +27,12 @@ CONF_POWER_SENSOR = "power_sensor"
 CONF_LOAD_BYTE_SENSOR = "load_byte_sensor"
 CONF_PIPE_IN_SENSOR = "pipe_in_sensor"
 CONF_PIPE_OUT_SENSOR = "pipe_out_sensor"
+CONF_UNKNOWN_BYTE_3_SENSOR = "unknown_byte_3_sensor"
+CONF_UNKNOWN_BYTE_5_SENSOR = "unknown_byte_5_sensor"
+CONF_UNKNOWN_BYTE_11_SENSOR = "unknown_byte_11_sensor"
+CONF_UNKNOWN_BYTE_12_SENSOR = "unknown_byte_12_sensor"
+CONF_UNKNOWN_BYTE_13_SENSOR = "unknown_byte_13_sensor"
+CONF_UNKNOWN_BYTE_14_SENSOR = "unknown_byte_14_sensor"
 
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
@@ -54,6 +60,30 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
             device_class=DEVICE_CLASS_TEMPERATURE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_UNKNOWN_BYTE_3_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_UNKNOWN_BYTE_5_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_UNKNOWN_BYTE_11_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_UNKNOWN_BYTE_12_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_UNKNOWN_BYTE_13_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_UNKNOWN_BYTE_14_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
     }
@@ -205,4 +235,45 @@ async def to_code(config):
         
         sens = await sensor.new_sensor(pipe_out_config)
         cg.add(var.set_pipe_out_sensor(sens))
+    
+    # Auto-generate unknown byte sensors for protocol analysis
+    # These track undecoded bytes in the 16-byte LGAP message
+    unknown_byte_sensors = [
+        (CONF_UNKNOWN_BYTE_3_SENSOR, "set_unknown_byte_3_sensor", "byte_3", "Unknown Byte 3"),
+        (CONF_UNKNOWN_BYTE_5_SENSOR, "set_unknown_byte_5_sensor", "byte_5", "Unknown Byte 5"),
+        (CONF_UNKNOWN_BYTE_11_SENSOR, "set_unknown_byte_11_sensor", "byte_11", "Unknown Byte 11"),
+        (CONF_UNKNOWN_BYTE_12_SENSOR, "set_unknown_byte_12_sensor", "byte_12", "Unknown Byte 12"),
+        (CONF_UNKNOWN_BYTE_13_SENSOR, "set_unknown_byte_13_sensor", "byte_13", "Unknown Byte 13"),
+        (CONF_UNKNOWN_BYTE_14_SENSOR, "set_unknown_byte_14_sensor", "byte_14", "Unknown Byte 14"),
+    ]
+    
+    for conf_key, setter_method, id_suffix, name_suffix in unknown_byte_sensors:
+        if conf_key in config:
+            sens = await sensor.new_sensor(config[conf_key])
+            cg.add(getattr(var, setter_method)(sens))
+        else:
+            # Auto-generate sensor
+            from esphome.core import ID
+            climate_id = config[CONF_ID].id
+            sensor_id = ID(f"{climate_id}_{id_suffix}", is_manual=False, type=sensor.Sensor)
+            
+            # Use climate name if available, otherwise derive from ID
+            if CONF_NAME in config:
+                sensor_name = f"{config[CONF_NAME]} {name_suffix}"
+            else:
+                friendly_name = climate_id.replace("_", " ").title()
+                sensor_name = f"{friendly_name} {name_suffix}"
+            
+            # Build and validate config
+            sensor_config_schema = sensor.sensor_schema(
+                accuracy_decimals=0,
+                state_class=STATE_CLASS_MEASUREMENT,
+            )
+            sensor_config = sensor_config_schema({
+                CONF_ID: sensor_id,
+                CONF_NAME: sensor_name,
+            })
+            
+            sens = await sensor.new_sensor(sensor_config)
+            cg.add(getattr(var, setter_method)(sens))
     
