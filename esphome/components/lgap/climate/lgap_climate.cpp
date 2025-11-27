@@ -10,8 +10,9 @@ namespace esphome
   {
 
     static const char *const TAG = "lgap.climate";
-    static const uint8_t MIN_TEMPERATURE = 16;
-    static const uint8_t MAX_TEMPERATURE = 36;
+    static const uint8_t MIN_TEMPERATURE = 16;  // Minimum is 16°C for heat mode
+    static const uint8_t MIN_TEMPERATURE_NON_HEAT = 18;  // 18°C minimum for cool/dry/fan/auto modes
+    static const uint8_t MAX_TEMPERATURE = 30;  // Maximum is 30°C for all modes
 
     // Approximate LG pipe temperature mapping in °C.
     // This is consistent with the room-sensor mapping and gives realistic values.
@@ -90,7 +91,10 @@ namespace esphome
           climate::CLIMATE_SWING_VERTICAL,
       });
 
-      // todo: validate these min/max numbers
+      // Temperature limits per LG specification:
+      // Heat mode: 16-30°C, all other modes: 18-30°C
+      // ESPHome traits don't support mode-specific ranges, so we show 16-30°C
+      // and enforce the 18°C minimum for non-heat modes in control()
       traits.set_visual_min_temperature(MIN_TEMPERATURE);
       traits.set_visual_max_temperature(MAX_TEMPERATURE);
       traits.set_visual_temperature_step(1);
@@ -212,6 +216,24 @@ namespace esphome
         // TODO: enable precision decimals as a yaml setting
         ESP_LOGD(TAG, "Temperature change requested");
         float temp = *call.get_target_temperature();
+        
+        // Apply mode-specific temperature limits
+        // Heat mode: 16-30°C, all other modes: 18-30°C
+        float min_temp = (this->mode == climate::CLIMATE_MODE_HEAT) ? MIN_TEMPERATURE : MIN_TEMPERATURE_NON_HEAT;
+        float max_temp = MAX_TEMPERATURE;
+        
+        // Clamp temperature to valid range
+        if (temp < min_temp)
+        {
+          ESP_LOGW(TAG, "Requested temperature %.1f°C is below minimum %.1f°C for current mode, clamping", temp, min_temp);
+          temp = min_temp;
+        }
+        else if (temp > max_temp)
+        {
+          ESP_LOGW(TAG, "Requested temperature %.1f°C is above maximum %.1f°C, clamping", temp, max_temp);
+          temp = max_temp;
+        }
+        
         if (temp != this->target_temperature_)
         {
           this->target_temperature_ = temp;
