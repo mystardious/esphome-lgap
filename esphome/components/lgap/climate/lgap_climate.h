@@ -33,6 +33,46 @@ namespace esphome
         LGAPHVACClimate *parent_{nullptr};
     };
 
+    // Lock temperature changes switch
+    class LockTemperatureSwitch : public switch_::Switch
+    {
+      public:
+        void set_parent(LGAPHVACClimate *parent) { this->parent_ = parent; }
+        void write_state(bool state) override;
+      protected:
+        LGAPHVACClimate *parent_{nullptr};
+    };
+
+    // Lock fan speed changes switch
+    class LockFanSpeedSwitch : public switch_::Switch
+    {
+      public:
+        void set_parent(LGAPHVACClimate *parent) { this->parent_ = parent; }
+        void write_state(bool state) override;
+      protected:
+        LGAPHVACClimate *parent_{nullptr};
+    };
+
+    // Lock mode changes switch
+    class LockModeSwitch : public switch_::Switch
+    {
+      public:
+        void set_parent(LGAPHVACClimate *parent) { this->parent_ = parent; }
+        void write_state(bool state) override;
+      protected:
+        LGAPHVACClimate *parent_{nullptr};
+    };
+
+    // Power only mode switch (allow only ON/OFF, lock all other controls)
+    class PowerOnlyModeSwitch : public switch_::Switch
+    {
+      public:
+        void set_parent(LGAPHVACClimate *parent) { this->parent_ = parent; }
+        void write_state(bool state) override;
+      protected:
+        LGAPHVACClimate *parent_{nullptr};
+    };
+
     class LGAPHVACClimate : public LGAPDevice, public climate::Climate
     {
       public:
@@ -60,6 +100,29 @@ namespace esphome
         }
         void set_control_lock(bool state);
         bool get_control_lock() const { return this->control_lock_; }
+        
+        // Function restrictions (partial locks)
+        void set_lock_temperature_switch(LockTemperatureSwitch *switch_) {
+          this->lock_temperature_switch_ = switch_;
+          switch_->set_parent(this);
+        }
+        void set_lock_fan_speed_switch(LockFanSpeedSwitch *switch_) {
+          this->lock_fan_speed_switch_ = switch_;
+          switch_->set_parent(this);
+        }
+        void set_lock_mode_switch(LockModeSwitch *switch_) {
+          this->lock_mode_switch_ = switch_;
+          switch_->set_parent(this);
+        }
+        void set_power_only_mode_switch(PowerOnlyModeSwitch *switch_) {
+          this->power_only_mode_switch_ = switch_;
+          switch_->set_parent(this);
+        }
+        
+        void set_lock_temperature(bool state);
+        void set_lock_fan_speed(bool state);
+        void set_lock_mode(bool state);
+        void set_power_only_mode(bool state);
         void set_zone_active_load_sensor(sensor::Sensor *sensor) { this->zone_active_load_sensor_ = sensor; }
         void set_zone_power_state_sensor(sensor::Sensor *sensor) { this->zone_power_state_sensor_ = sensor; }
         void set_zone_design_load_sensor(sensor::Sensor *sensor) { this->zone_design_load_sensor_ = sensor; }
@@ -78,6 +141,12 @@ namespace esphome
         uint8_t mode_{0};
         uint8_t fan_speed_{0};
         bool control_lock_{false};  // Child lock state (TX4 bit2)
+        
+        // Function restrictions (partial locks)
+        bool lock_temperature_{false};  // Lock temperature up/down
+        bool lock_fan_speed_{false};    // Lock fan speed changes
+        bool lock_mode_{false};         // Lock mode changes
+        bool power_only_mode_{false};   // Only allow ON/OFF, lock all other controls
 
         float current_temperature_{0.0f};
         float target_temperature_{0.0f};
@@ -101,6 +170,12 @@ namespace esphome
         
         // Control lock switch
         ControlLockSwitch *control_lock_switch_{nullptr};
+        
+        // Function restriction switches
+        LockTemperatureSwitch *lock_temperature_switch_{nullptr};
+        LockFanSpeedSwitch *lock_fan_speed_switch_{nullptr};
+        LockModeSwitch *lock_mode_switch_{nullptr};
+        PowerOnlyModeSwitch *power_only_mode_switch_{nullptr};
 
         //todo: evaluate whether to use esppreferenceobject or not
         // ESPPreferenceObject power_state_preference_; //uint8_t

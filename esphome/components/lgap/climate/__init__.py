@@ -22,6 +22,10 @@ CODEOWNERS = ["@jourdant"]
 LGAP_HVAC_Climate = lgap_ns.class_("LGAPHVACClimate", cg.Component, climate.Climate)
 TimerDurationNumber = lgap_ns.class_("TimerDurationNumber", number.Number)
 ControlLockSwitch = lgap_ns.class_("ControlLockSwitch", switch.Switch)
+LockTemperatureSwitch = lgap_ns.class_("LockTemperatureSwitch", switch.Switch)
+LockFanSpeedSwitch = lgap_ns.class_("LockFanSpeedSwitch", switch.Switch)
+LockModeSwitch = lgap_ns.class_("LockModeSwitch", switch.Switch)
+PowerOnlyModeSwitch = lgap_ns.class_("PowerOnlyModeSwitch", switch.Switch)
 
 CONF_ZONE_NUMBER = "zone"
 CONF_TEMPERATURE_PUBISH_TIME = "temperature_publish_time"
@@ -35,6 +39,10 @@ CONF_ODU_TOTAL_LOAD_SENSOR = "odu_total_load_sensor"
 CONF_SLEEP_TIMER = "sleep_timer"
 CONF_TIMER_REMAINING = "timer_remaining"
 CONF_CONTROL_LOCK = "control_lock"
+CONF_LOCK_TEMPERATURE = "lock_temperature"
+CONF_LOCK_FAN_SPEED = "lock_fan_speed"
+CONF_LOCK_MODE = "lock_mode"
+CONF_POWER_ONLY_MODE = "power_only_mode"
 
 CONFIG_SCHEMA = climate.climate_schema(
     LGAP_HVAC_Climate
@@ -91,6 +99,18 @@ CONFIG_SCHEMA = climate.climate_schema(
         ),
         cv.Optional(CONF_CONTROL_LOCK): switch.switch_schema(
             ControlLockSwitch,
+        ),
+        cv.Optional(CONF_LOCK_TEMPERATURE): switch.switch_schema(
+            LockTemperatureSwitch,
+        ),
+        cv.Optional(CONF_LOCK_FAN_SPEED): switch.switch_schema(
+            LockFanSpeedSwitch,
+        ),
+        cv.Optional(CONF_LOCK_MODE): switch.switch_schema(
+            LockModeSwitch,
+        ),
+        cv.Optional(CONF_POWER_ONLY_MODE): switch.switch_schema(
+            PowerOnlyModeSwitch,
         ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -328,4 +348,37 @@ async def to_code(config):
         sw = cg.new_Pvariable(sw_id)
         await switch.register_switch(sw, sw_config)
         cg.add(var.set_control_lock_switch(sw))
+    
+    # Function restriction switches - auto-generate
+    function_locks = [
+        (CONF_LOCK_TEMPERATURE, LockTemperatureSwitch, "set_lock_temperature_switch", "lock_temperature", "Lock Temperature"),
+        (CONF_LOCK_FAN_SPEED, LockFanSpeedSwitch, "set_lock_fan_speed_switch", "lock_fan_speed", "Lock Fan Speed"),
+        (CONF_LOCK_MODE, LockModeSwitch, "set_lock_mode_switch", "lock_mode", "Lock Mode"),
+        (CONF_POWER_ONLY_MODE, PowerOnlyModeSwitch, "set_power_only_mode_switch", "power_only_mode", "Power Only Mode"),
+    ]
+    
+    for conf_key, switch_class, setter_method, id_suffix, name_suffix in function_locks:
+        if conf_key in config:
+            sw = cg.new_Pvariable(config[conf_key][CONF_ID])
+            await switch.register_switch(sw, config[conf_key])
+            cg.add(getattr(var, setter_method)(sw))
+        else:
+            from esphome.core import ID
+            climate_id = config[CONF_ID].id
+            sw_id = ID(f"{climate_id}_{id_suffix}", is_manual=False, type=switch.Switch)
+            
+            if CONF_NAME in config:
+                sw_name = f"{config[CONF_NAME]} {name_suffix}"
+            else:
+                friendly_name = climate_id.replace("_", " ").title()
+                sw_name = f"{friendly_name} {name_suffix}"
+            
+            sw_config = switch.switch_schema(switch_class)({
+                CONF_ID: sw_id,
+                CONF_NAME: sw_name,
+            })
+            
+            sw = cg.new_Pvariable(sw_id)
+            await switch.register_switch(sw, sw_config)
+            cg.add(getattr(var, setter_method)(sw))
     

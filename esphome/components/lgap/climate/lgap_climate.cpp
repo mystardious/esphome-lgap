@@ -6,6 +6,21 @@
 
 // LG LGAP Protocol Reference
 // ============================
+//
+// FUNCTION LOCKS (Partial Lock Features):
+// ========================================
+// These locks prevent both Home Assistant AND wall controller changes.
+// When a lock is active and a change is detected from the wall controller,
+// ESPHome automatically reverts it by sending the previous value back.
+//
+// - Lock Temperature: Prevents temperature up/down changes
+// - Lock Fan Speed: Prevents fan speed changes  
+// - Lock Mode: Prevents mode changes (COOL↔HEAT↔etc)
+// - Power Only Mode: Allows ONLY ON/OFF, locks temp/fan/mode
+//
+// Enforcement: Changes from wall controller trigger write_update_pending
+// to send the original value back, effectively blocking the change.
+//
 // Control Flags (TX message[4] / RX message[1]):
 //   bit0: ON (power state: 1=ON, 0=OFF)
 //   bit1: EXE (execute write command)
@@ -82,6 +97,43 @@ namespace esphome
       if (this->parent_ != nullptr)
       {
         this->parent_->set_control_lock(state);
+      }
+    }
+
+    // Function restriction switch implementations
+    void LockTemperatureSwitch::write_state(bool state)
+    {
+      this->publish_state(state);
+      if (this->parent_ != nullptr)
+      {
+        this->parent_->set_lock_temperature(state);
+      }
+    }
+
+    void LockFanSpeedSwitch::write_state(bool state)
+    {
+      this->publish_state(state);
+      if (this->parent_ != nullptr)
+      {
+        this->parent_->set_lock_fan_speed(state);
+      }
+    }
+
+    void LockModeSwitch::write_state(bool state)
+    {
+      this->publish_state(state);
+      if (this->parent_ != nullptr)
+      {
+        this->parent_->set_lock_mode(state);
+      }
+    }
+
+    void PowerOnlyModeSwitch::write_state(bool state)
+    {
+      this->publish_state(state);
+      if (this->parent_ != nullptr)
+      {
+        this->parent_->set_power_only_mode(state);
       }
     }
     static const uint8_t MIN_TEMPERATURE = 16;  // Minimum is 16°C for heat mode
@@ -182,9 +234,47 @@ namespace esphome
     {
       ESP_LOGD(TAG, "esphome::climate::ClimateCall");
 
+      // Check if power-only mode is active
+      if (this->power_only_mode_)
+      {
+        // In power-only mode, only allow ON/OFF changes, block everything else
+        if (call.get_mode().has_value())
+        {
+          climate::ClimateMode mode = *call.get_mode();
+          // Only allow OFF mode change, block all other modes
+          if (mode == climate::CLIMATE_MODE_OFF)
+          {
+            if (this->mode != mode)
+            {
+              this->power_state_ = 0;
+              this->write_update_pending = true;
+              this->mode = mode;
+              this->publish_state();
+            }
+          }
+          else
+          {
+            ESP_LOGW(TAG, "Mode change blocked - power-only mode is active");
+          }
+        }
+        // Block all other control changes
+        if (call.get_target_temperature().has_value() || call.get_fan_mode().has_value() || call.get_swing_mode().has_value())
+        {
+          ESP_LOGW(TAG, "Control changes blocked - power-only mode is active (only ON/OFF allowed)");
+        }
+        return;
+      }
+
       // mode
       if (call.get_mode().has_value())
       {
+        // Check if mode changes are locked
+        if (this->lock_mode_ && this->mode != climate::CLIMATE_MODE_OFF)
+        {
+          ESP_LOGW(TAG, "Mode change blocked - mode lock is active");
+          return;
+        }
+        
         ESP_LOGD(TAG, "Mode change requested");
         climate::ClimateMode mode = *call.get_mode();
 
@@ -233,6 +323,13 @@ namespace esphome
       // fan speed
       if (call.get_fan_mode().has_value())
       {
+        // Check if fan speed changes are locked
+        if (this->lock_fan_speed_)
+        {
+          ESP_LOGW(TAG, "Fan speed change blocked - fan speed lock is active");
+          return;
+        }
+        
         ESP_LOGD(TAG, "Fan speed change requested");
         climate::ClimateFanMode fan_mode = *call.get_fan_mode();
 
@@ -307,6 +404,13 @@ namespace esphome
       // target temperature
       if (call.get_target_temperature().has_value())
       {
+        // Check if temperature changes are locked
+        if (this->lock_temperature_)
+        {
+          ESP_LOGW(TAG, "Temperature change blocked - temperature lock is active");
+          return;
+        }
+        
         // TODO: enable precision decimals as a yaml setting
         ESP_LOGD(TAG, "Temperature change requested");
         float temp = *call.get_target_temperature();
@@ -454,10 +558,20 @@ namespace esphome
             this->mode = climate::CLIMATE_MODE_OFF;
           }
 
-          // update state
-          publish_update = true;
-          this->mode_ = mode;
-          this->power_state_ = power_state;
+          // Check if mode changes should be enforced (mode lock or power-only mode)
+          if ((this->lock_mode_ || this->power_only_mode_) && mode != this->mode_ && this->power_state_ == 1)
+          {
+            ESP_LOGW(TAG, "Mode changed at wall controller while lock active - reverting to previous mode");
+            this->write_update_pending = true;  // Force write to revert
+            // Don't update mode_ to keep previous value
+          }
+          else
+          {
+            // update state
+            publish_update = true;
+            this->mode_ = mode;
+            this->power_state_ = power_state;
+          }
         }
 
         // swing options
@@ -530,9 +644,19 @@ namespace esphome
             ESP_LOGE(TAG, "Invalid fan speed received: %d", fan_speed);
           }
 
-          // update state
-          this->fan_speed_ = fan_speed;
-          publish_update = true;
+          // Check if fan speed changes should be enforced (fan speed lock or power-only mode)
+          if ((this->lock_fan_speed_ || this->power_only_mode_) && fan_speed != this->fan_speed_)
+          {
+            ESP_LOGW(TAG, "Fan speed changed at wall controller while lock active - reverting to previous speed");
+            this->write_update_pending = true;  // Force write to revert
+            // Don't update fan_speed_ to keep previous value
+          }
+          else
+          {
+            // update state
+            this->fan_speed_ = fan_speed;
+            publish_update = true;
+          }
         }
 
         // Target temperature in °C from LGAP frame
@@ -547,9 +671,20 @@ namespace esphome
         
         if (target_temperature != this->target_temperature_)
         {
-          this->target_temperature_ = target_temperature;
-          this->target_temperature = target_temperature;
-          publish_update = true;
+          // Check if temperature changes should be enforced (temperature lock or power-only mode)
+          if (this->lock_temperature_ || this->power_only_mode_)
+          {
+            ESP_LOGW(TAG, "Temperature changed at wall controller (%.0f°C→%.0f°C) while lock active - reverting", 
+                     this->target_temperature_, target_temperature);
+            this->write_update_pending = true;  // Force write to revert
+            // Don't update target_temperature_ to keep previous value
+          }
+          else
+          {
+            this->target_temperature_ = target_temperature;
+            this->target_temperature = target_temperature;
+            publish_update = true;
+          }
         }
       } // end of control state update block (write_update_pending check)
 
@@ -785,6 +920,42 @@ namespace esphome
         this->control_lock_ = state;
         this->write_update_pending = true;
         ESP_LOGI(TAG, "Control lock %s", state ? "ENABLED" : "DISABLED");
+      }
+    }
+
+    void LGAPHVACClimate::set_lock_temperature(bool state)
+    {
+      if (this->lock_temperature_ != state)
+      {
+        this->lock_temperature_ = state;
+        ESP_LOGI(TAG, "Temperature lock %s", state ? "ENABLED" : "DISABLED");
+      }
+    }
+
+    void LGAPHVACClimate::set_lock_fan_speed(bool state)
+    {
+      if (this->lock_fan_speed_ != state)
+      {
+        this->lock_fan_speed_ = state;
+        ESP_LOGI(TAG, "Fan speed lock %s", state ? "ENABLED" : "DISABLED");
+      }
+    }
+
+    void LGAPHVACClimate::set_lock_mode(bool state)
+    {
+      if (this->lock_mode_ != state)
+      {
+        this->lock_mode_ = state;
+        ESP_LOGI(TAG, "Mode lock %s", state ? "ENABLED" : "DISABLED");
+      }
+    }
+
+    void LGAPHVACClimate::set_power_only_mode(bool state)
+    {
+      if (this->power_only_mode_ != state)
+      {
+        this->power_only_mode_ = state;
+        ESP_LOGI(TAG, "Power-only mode %s", state ? "ENABLED (only ON/OFF allowed)" : "DISABLED");
       }
     }
 
