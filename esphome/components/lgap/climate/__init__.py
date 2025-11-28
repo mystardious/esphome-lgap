@@ -306,7 +306,7 @@ async def to_code(config):
             CONF_NAME: num_name,
         })
         
-        num = cg.new_Pvariable(num_id, TimerDurationNumber)
+        num = cg.new_Pvariable(num_id)
         await number.register_number(num, num_config, min_value=0, max_value=420, step=1)
         cg.add(var.set_timer_duration_number(num))
     
@@ -359,7 +359,7 @@ async def to_code(config):
             CONF_NAME: sw_name,
         })
         
-        sw = cg.new_Pvariable(sw_id, ControlLockSwitch)
+        sw = cg.new_Pvariable(sw_id)
         await switch.register_switch(sw, sw_config)
         cg.add(var.set_control_lock_switch(sw))
     
@@ -392,7 +392,7 @@ async def to_code(config):
                 CONF_NAME: sw_name,
             })
             
-            sw = cg.new_Pvariable(sw_id, switch_class)
+            sw = cg.new_Pvariable(sw_id)
             await switch.register_switch(sw, sw_config)
             cg.add(getattr(var, setter_method)(sw))
     
@@ -418,7 +418,7 @@ async def to_code(config):
                 CONF_NAME: sw_name,
             })
             
-            sw = cg.new_Pvariable(sw_id, PlasmaSwitch)
+            sw = cg.new_Pvariable(sw_id)
             await switch.register_switch(sw, sw_config)
             cg.add(var.set_plasma_switch(sw))
     
