@@ -140,6 +140,16 @@ namespace esphome
         this->parent_->set_power_only_mode(state);
       }
     }
+
+    void PlasmaSwitch::write_state(bool state)
+    {
+      this->publish_state(state);
+      if (this->parent_ != nullptr)
+      {
+        this->parent_->set_plasma(state);
+      }
+    }
+
     static const uint8_t MIN_TEMPERATURE = 16;  // Minimum is 16°C for heat mode
     static const uint8_t MIN_TEMPERATURE_NON_HEAT = 18;  // 18°C minimum for cool/dry/fan/auto modes
     static const uint8_t MAX_TEMPERATURE = 30;  // Maximum is 30°C for all modes
@@ -210,14 +220,28 @@ namespace esphome
           climate::CLIMATE_MODE_HEAT_COOL,
       });
 
-      traits.set_supported_fan_modes({
+      // Build fan modes list - always include basic manual modes
+      std::set<climate::ClimateFanMode> fan_modes = {
           climate::CLIMATE_FAN_LOW,
           climate::CLIMATE_FAN_MEDIUM,
           climate::CLIMATE_FAN_HIGH,
-          climate::CLIMATE_FAN_AUTO,
-          climate::CLIMATE_FAN_QUIET,  // SLOW mode
-          climate::CLIMATE_FAN_FOCUS,  // TURBO/POWER mode
-      });
+      };
+      
+      // Add optional fan modes if explicitly enabled
+      if (this->supports_auto_fan_)
+      {
+        fan_modes.insert(climate::CLIMATE_FAN_AUTO);
+      }
+      if (this->supports_quiet_fan_)
+      {
+        fan_modes.insert(climate::CLIMATE_FAN_QUIET);  // SLOW mode
+      }
+      if (this->supports_turbo_fan_)
+      {
+        fan_modes.insert(climate::CLIMATE_FAN_FOCUS);  // TURBO/POWER mode
+      }
+      
+      traits.set_supported_fan_modes(fan_modes);
 
       // Auto swing (auto airflow) - optional feature for ducted units
       // Only expose swing control if explicitly enabled in YAML
@@ -481,8 +505,8 @@ namespace esphome
       // bit1: EXE (execute / write_state)
       // bit2: Lock (control lock)
       // bit3: reserved (0)
-      // bit4: Plasma (not implemented)
-      uint8_t control_flags = this->power_state_ | write_state | (this->control_lock_ ? 0x04 : 0x00);
+      // bit4: Plasma ion (air purification)
+      uint8_t control_flags = this->power_state_ | write_state | (this->control_lock_ ? 0x04 : 0x00) | (this->plasma_ ? 0x10 : 0x00);
       message.push_back(control_flags);
       
       // Byte 5: Mode (bits 0-2) | Swing (bits 3-4) | Fan Speed (bits 4-6)
@@ -522,6 +546,18 @@ namespace esphome
           this->control_lock_switch_->publish_state(control_lock);
         }
         ESP_LOGD(TAG, "Control lock %s", control_lock ? "ENABLED" : "DISABLED");
+      }
+
+      // Plasma ion state (message[1] bit4 based on protocol TX4 layout)
+      bool plasma = (message[1] & 0x10) != 0;
+      if (plasma != this->plasma_)
+      {
+        this->plasma_ = plasma;
+        if (this->plasma_switch_ != nullptr)
+        {
+          this->plasma_switch_->publish_state(plasma);
+        }
+        ESP_LOGD(TAG, "Plasma ion %s", plasma ? "ON" : "OFF");
       }
 
       // Error code (TX5 / message[5]) - 0 = OK, others = service codes
@@ -982,6 +1018,16 @@ namespace esphome
       {
         this->power_only_mode_ = state;
         ESP_LOGI(TAG, "Power-only mode %s", state ? "ENABLED (only ON/OFF allowed)" : "DISABLED");
+      }
+    }
+
+    void LGAPHVACClimate::set_plasma(bool state)
+    {
+      if (this->plasma_ != state)
+      {
+        this->plasma_ = state;
+        this->write_update_pending = true;
+        ESP_LOGI(TAG, "Plasma ion %s", state ? "ON" : "OFF");
       }
     }
 

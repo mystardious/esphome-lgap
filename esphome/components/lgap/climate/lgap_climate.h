@@ -73,6 +73,16 @@ namespace esphome
         LGAPHVACClimate *parent_{nullptr};
     };
 
+    // Plasma ion switch (air purification feature)
+    class PlasmaSwitch : public switch_::Switch
+    {
+      public:
+        void set_parent(LGAPHVACClimate *parent) { this->parent_ = parent; }
+        void write_state(bool state) override;
+      protected:
+        LGAPHVACClimate *parent_{nullptr};
+    };
+
     class LGAPHVACClimate : public LGAPDevice, public climate::Climate
     {
       public:
@@ -80,6 +90,10 @@ namespace esphome
         void setup() override;
         void set_temperature_publish_time(int temperature_publish_time) { this->temperature_publish_time_ = temperature_publish_time; }
         void set_supports_auto_swing(bool supports) { this->supports_auto_swing_ = supports; }
+        void set_supports_auto_fan(bool supports) { this->supports_auto_fan_ = supports; }
+        void set_supports_quiet_fan(bool supports) { this->supports_quiet_fan_ = supports; }
+        void set_supports_turbo_fan(bool supports) { this->supports_turbo_fan_ = supports; }
+        void set_supports_plasma(bool supports) { this->supports_plasma_ = supports; }
         void set_pipe_in_sensor(sensor::Sensor *sensor) { this->pipe_in_sensor_ = sensor; }
         void set_pipe_out_sensor(sensor::Sensor *sensor) { this->pipe_out_sensor_ = sensor; }
         void set_error_code_sensor(sensor::Sensor *sensor) { this->error_code_sensor_ = sensor; }
@@ -119,11 +133,17 @@ namespace esphome
           this->power_only_mode_switch_ = switch_;
           switch_->set_parent(this);
         }
+        void set_plasma_switch(PlasmaSwitch *switch_) {
+          this->plasma_switch_ = switch_;
+          switch_->set_parent(this);
+        }
         
         void set_lock_temperature(bool state);
         void set_lock_fan_speed(bool state);
         void set_lock_mode(bool state);
         void set_power_only_mode(bool state);
+        void set_plasma(bool state);
+        bool get_plasma() const { return this->plasma_; }
         void set_zone_active_load_sensor(sensor::Sensor *sensor) { this->zone_active_load_sensor_ = sensor; }
         void set_zone_power_state_sensor(sensor::Sensor *sensor) { this->zone_power_state_sensor_ = sensor; }
         void set_zone_design_load_sensor(sensor::Sensor *sensor) { this->zone_design_load_sensor_ = sensor; }
@@ -138,12 +158,17 @@ namespace esphome
         uint32_t temperature_last_publish_time_{0};
         
         bool supports_auto_swing_{false};  // Whether to expose auto swing mode
+        bool supports_auto_fan_{false};    // Whether to expose auto fan speed mode
+        bool supports_quiet_fan_{false};   // Whether to expose quiet/slow fan mode
+        bool supports_turbo_fan_{false};   // Whether to expose turbo/power fan mode
+        bool supports_plasma_{false};      // Whether to expose plasma ion control
 
         uint8_t power_state_{0};
         uint8_t swing_{0};
         uint8_t mode_{0};
         uint8_t fan_speed_{0};
         bool control_lock_{false};  // Child lock state (TX4 bit2)
+        bool plasma_{false};        // Plasma ion state (TX4 bit4)
         
         // Function restrictions (partial locks)
         bool lock_temperature_{false};  // Lock temperature up/down
@@ -179,6 +204,7 @@ namespace esphome
         LockFanSpeedSwitch *lock_fan_speed_switch_{nullptr};
         LockModeSwitch *lock_mode_switch_{nullptr};
         PowerOnlyModeSwitch *power_only_mode_switch_{nullptr};
+        PlasmaSwitch *plasma_switch_{nullptr};
 
         //todo: evaluate whether to use esppreferenceobject or not
         // ESPPreferenceObject power_state_preference_; //uint8_t

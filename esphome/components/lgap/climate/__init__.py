@@ -26,10 +26,16 @@ LockTemperatureSwitch = lgap_ns.class_("LockTemperatureSwitch", switch.Switch)
 LockFanSpeedSwitch = lgap_ns.class_("LockFanSpeedSwitch", switch.Switch)
 LockModeSwitch = lgap_ns.class_("LockModeSwitch", switch.Switch)
 PowerOnlyModeSwitch = lgap_ns.class_("PowerOnlyModeSwitch", switch.Switch)
+PlasmaSwitch = lgap_ns.class_("PlasmaSwitch", switch.Switch)
 
 CONF_ZONE_NUMBER = "zone"
 CONF_TEMPERATURE_PUBISH_TIME = "temperature_publish_time"
 CONF_SUPPORTS_AUTO_SWING = "supports_auto_swing"
+CONF_SUPPORTS_AUTO_FAN = "supports_auto_fan"
+CONF_SUPPORTS_QUIET_FAN = "supports_quiet_fan"
+CONF_SUPPORTS_TURBO_FAN = "supports_turbo_fan"
+CONF_SUPPORTS_PLASMA = "supports_plasma"
+CONF_PLASMA = "plasma"
 CONF_PIPE_IN_SENSOR = "pipe_in_sensor"
 CONF_PIPE_OUT_SENSOR = "pipe_out_sensor"
 CONF_ERROR_CODE_SENSOR = "error_code_sensor"
@@ -53,6 +59,10 @@ CONFIG_SCHEMA = climate.climate_schema(
         cv.Optional(CONF_ZONE_NUMBER, default=0): cv.All(cv.int_),
         cv.Optional(CONF_TEMPERATURE_PUBISH_TIME, default="300000ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_SUPPORTS_AUTO_SWING, default=False): cv.boolean,
+        cv.Optional(CONF_SUPPORTS_AUTO_FAN, default=False): cv.boolean,
+        cv.Optional(CONF_SUPPORTS_QUIET_FAN, default=False): cv.boolean,
+        cv.Optional(CONF_SUPPORTS_TURBO_FAN, default=False): cv.boolean,
+        cv.Optional(CONF_SUPPORTS_PLASMA, default=False): cv.boolean,
         cv.Optional(CONF_PIPE_IN_SENSOR): sensor.sensor_schema(
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
@@ -114,6 +124,9 @@ CONFIG_SCHEMA = climate.climate_schema(
         cv.Optional(CONF_POWER_ONLY_MODE): switch.switch_schema(
             PowerOnlyModeSwitch,
         ),
+        cv.Optional(CONF_PLASMA): switch.switch_schema(
+            PlasmaSwitch,
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -134,6 +147,10 @@ async def to_code(config):
     cg.add(var.set_zone_number(config[CONF_ZONE_NUMBER]))
     cg.add(var.set_temperature_publish_time(config[CONF_TEMPERATURE_PUBISH_TIME]))
     cg.add(var.set_supports_auto_swing(config[CONF_SUPPORTS_AUTO_SWING]))
+    cg.add(var.set_supports_auto_fan(config[CONF_SUPPORTS_AUTO_FAN]))
+    cg.add(var.set_supports_quiet_fan(config[CONF_SUPPORTS_QUIET_FAN]))
+    cg.add(var.set_supports_turbo_fan(config[CONF_SUPPORTS_TURBO_FAN]))
+    cg.add(var.set_supports_plasma(config[CONF_SUPPORTS_PLASMA]))
     
     # Set pipe-in temperature sensor - auto-generate name if not explicitly configured
     if CONF_PIPE_IN_SENSOR in config:
@@ -384,4 +401,30 @@ async def to_code(config):
             sw = cg.new_Pvariable(sw_id)
             await switch.register_switch(sw, sw_config)
             cg.add(getattr(var, setter_method)(sw))
+    
+    # Plasma switch - only if feature is enabled
+    if config[CONF_SUPPORTS_PLASMA]:
+        if CONF_PLASMA in config:
+            sw = cg.new_Pvariable(config[CONF_PLASMA][CONF_ID])
+            await switch.register_switch(sw, config[CONF_PLASMA])
+            cg.add(var.set_plasma_switch(sw))
+        else:
+            from esphome.core import ID
+            climate_id = config[CONF_ID].id
+            sw_id = ID(f"{climate_id}_plasma", is_manual=False, type=switch.Switch)
+            
+            if CONF_NAME in config:
+                sw_name = f"{config[CONF_NAME]} Plasma"
+            else:
+                friendly_name = climate_id.replace("_", " ").title()
+                sw_name = f"{friendly_name} Plasma"
+            
+            sw_config = switch.switch_schema(PlasmaSwitch)({
+                CONF_ID: sw_id,
+                CONF_NAME: sw_name,
+            })
+            
+            sw = cg.new_Pvariable(sw_id)
+            await switch.register_switch(sw, sw_config)
+            cg.add(var.set_plasma_switch(sw))
     
