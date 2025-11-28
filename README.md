@@ -13,7 +13,7 @@ One of the best benefits of using this integration is you can use a single LGAP 
 
 ![homeassistant](./images/ha1.png)
 
-![](Screenshot 2025-11-28 at 2.40.53 pm)
+![homeassistant](./images/ha2.png)
 
 ## Recent Updates (November 2025)
 
@@ -120,27 +120,65 @@ I am making the assumption that you're also using the M5Stack devices as listed 
 external_components:
   - source:
       type: git
-      url: https://github.com/jourdant/esphome-lgap
+      url: https://github.com/mystardious/esphome-lgap  # or jourdant/esphome-lgap
       ref: main
     components: [ "lgap"]
     refresh: 0sec
 
+uart:
+  id: lgap_uart1
+  tx_pin:
+    number: GPIO19
+  rx_pin:
+    number: GPIO22
+  baud_rate: 4800
+  data_bits: 8
+  stop_bits: 1
+  parity: NONE
+
+# Required for auto-generated entities
+sensor:
+number:
+switch:
+button:
+
 lgap:
   - id: lgap1
     uart_id: lgap_uart1
+    receive_wait_time: 250ms   # Faster response (default: 500ms)
+    loop_wait_time: 100ms      # Faster polling (default: 500ms)
+    tx_byte_0: 0x80            # Frame header byte
 
 climate:
   - platform: lgap
-    id: lgap_zone_1
-    name: 'Zone 1 - Ground Floor'
+    id: lg_zone_0
+    name: "Mohamed Ali Room"
     lgap_id: lgap1
-    zone: 0
+    zone: 5
 
   - platform: lgap
-    id: lgap_zone_2
-    name: 'Zone 2 - Front Office'
+    id: lg_zone_1
+    name: "Cinema Room"
     lgap_id: lgap1
     zone: 1
+
+  - platform: lgap
+    id: lg_zone_2
+    name: "Living Room A"
+    lgap_id: lgap1
+    zone: 2
+
+  - platform: lgap
+    id: lg_zone_3
+    name: "Living Room B"
+    lgap_id: lgap1
+    zone: 3
+
+  - platform: lgap
+    id: lg_zone_4
+    name: "Hadi Room"
+    lgap_id: lgap1
+    zone: 4
 ```
 
 If you want to add extra zones, you can reference the same ```lgap_id``` on the climate component. It is also possible to have multiple LGAP protocol components using different UART components in the same configuration.
