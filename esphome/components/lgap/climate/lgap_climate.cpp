@@ -4,6 +4,37 @@
 #include "../lgap.h"
 #include "lgap_climate.h"
 
+// LG LGAP Protocol Reference
+// ============================
+// Mode (message[6] bits 0-2):
+//   0 = COOL, 1 = DRY, 2 = FAN_ONLY, 3 = AUTO, 4 = HEAT
+//
+// Fan Speed (message[6] bits 4-6):
+//   0 = NO_CHANGE, 1 = LOW, 2 = MEDIUM, 3 = HIGH, 4 = AUTO
+//   5 = SLOW (quiet), 6 = POWER/TURBO, 7 = SLOW+POWER (rare)
+//
+// Target Temp (message[7] lower nibble):
+//   0-15 → Indoor set temp = value + 15°C (16-30°C range)
+//
+// Room Temp (message[8]):
+//   0-255 raw → Temp(°C) = (192 - raw) / 3
+//
+// Pipe Temps (message[9], message[10]):
+//   Same formula as room temp: Temp(°C) = (192 - raw) / 3
+//
+// Zone Active Load (message[11]):
+//   0-255, typical idle: 204, under load: 80-220
+//   LOWER value = HIGHER active load (inverse)
+//
+// Zone Power State (message[12]):
+//   0 = RUNNING/ON, 1 = OFF/IDLE
+//
+// Zone Design Load (message[13]):
+//   Constant per IDU design capacity (e.g., 9, 12, 24)
+//
+// ODU Total Load (message[14]):
+//   ~Sum of design loads of ON zones, smoothed (0-255)
+
 namespace esphome
 {
   namespace lgap
@@ -104,6 +135,9 @@ namespace esphome
           climate::CLIMATE_FAN_LOW,
           climate::CLIMATE_FAN_MEDIUM,
           climate::CLIMATE_FAN_HIGH,
+          climate::CLIMATE_FAN_AUTO,
+          climate::CLIMATE_FAN_QUIET,  // SLOW mode
+          climate::CLIMATE_FAN_FOCUS,  // TURBO/POWER mode
       });
 
       traits.set_supported_swing_modes({
@@ -181,22 +215,39 @@ namespace esphome
 
         if (this->fan_mode != fan_mode)
         {
-          if (fan_mode == climate::CLIMATE_FAN_AUTO)
-          {
-            // auto fan is actually not supported right now, so we set it to Low
-            this->fan_speed_ = 0;
-          }
-          else if (fan_mode == climate::CLIMATE_FAN_LOW)
-          {
-            this->fan_speed_ = 0;
-          }
-          else if (fan_mode == climate::CLIMATE_FAN_MEDIUM)
+          // Fan speed encoding per LG protocol:
+          // 0 = NO_CHANGE (don't use for setting)
+          // 1 = LOW
+          // 2 = MEDIUM
+          // 3 = HIGH
+          // 4 = AUTO
+          // 5 = SLOW (QUIET)
+          // 6 = POWER/TURBO
+          // 7 = SLOW+POWER (rare)
+          
+          if (fan_mode == climate::CLIMATE_FAN_LOW)
           {
             this->fan_speed_ = 1;
           }
-          else if (fan_mode == climate::CLIMATE_FAN_HIGH)
+          else if (fan_mode == climate::CLIMATE_FAN_MEDIUM)
           {
             this->fan_speed_ = 2;
+          }
+          else if (fan_mode == climate::CLIMATE_FAN_HIGH)
+          {
+            this->fan_speed_ = 3;
+          }
+          else if (fan_mode == climate::CLIMATE_FAN_AUTO)
+          {
+            this->fan_speed_ = 4;
+          }
+          else if (fan_mode == climate::CLIMATE_FAN_QUIET)
+          {
+            this->fan_speed_ = 5;  // SLOW mode
+          }
+          else if (fan_mode == climate::CLIMATE_FAN_FOCUS)
+          {
+            this->fan_speed_ = 6;  // TURBO/POWER mode
           }
 
           // publish state
@@ -376,20 +427,47 @@ namespace esphome
         }
 
         // fan speed
+        // Fan speed decoding per LG protocol:
+        // 0 = NO_CHANGE / model-dependent (treat as no update)
+        // 1 = LOW
+        // 2 = MEDIUM
+        // 3 = HIGH
+        // 4 = AUTO
+        // 5 = SLOW (QUIET)
+        // 6 = POWER/TURBO
+        // 7 = SLOW+POWER (rare)
         uint8_t fan_speed = ((message[6] >> 4) & 7);
-        if (fan_speed != this->fan_speed_)
+        if (fan_speed != this->fan_speed_ && fan_speed != 0)  // 0 = NO_CHANGE
         {
-          if (fan_speed == 0)
+          if (fan_speed == 1)
           {
             this->fan_mode = climate::CLIMATE_FAN_LOW;
           }
-          else if (fan_speed == 1)
+          else if (fan_speed == 2)
           {
             this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
           }
-          else if (fan_speed == 2)
+          else if (fan_speed == 3)
           {
             this->fan_mode = climate::CLIMATE_FAN_HIGH;
+          }
+          else if (fan_speed == 4)
+          {
+            this->fan_mode = climate::CLIMATE_FAN_AUTO;
+          }
+          else if (fan_speed == 5)
+          {
+            this->fan_mode = climate::CLIMATE_FAN_QUIET;  // SLOW mode
+          }
+          else if (fan_speed == 6)
+          {
+            this->fan_mode = climate::CLIMATE_FAN_FOCUS;  // TURBO/POWER mode
+          }
+          else if (fan_speed == 7)
+          {
+            // SLOW+POWER mode - map to FOCUS for now
+            this->fan_mode = climate::CLIMATE_FAN_FOCUS;
+            ESP_LOGW(TAG, "Received SLOW+POWER fan mode (7), mapping to TURBO");
           }
           else
           {
@@ -495,22 +573,23 @@ namespace esphome
       //   15: checksum
       
       // Byte 11: Zone Active Load (LonWorks: nvoLoadEstimate / nvoUnitLoad)
-      // Dynamic real-time per-zone thermal load estimate
+      // Dynamic real-time per-zone thermal load estimate (0-255)
+      // - Typical idle: ~204
+      // - Under load: 80-220 range
+      // - LOWER value = HIGHER active IDU load (inverse relationship!)
       // - Rises when zone is calling for cooling/heating
       // - Falls as zone approaches setpoint
-      // - Goes to zero when zone is idle/off
       // - Proportional to design load but affected by temp delta & demand
-      // - Scales with rated capacity: design_load × demand_factor
       uint8_t zone_active_load = message[11];
       if (this->zone_active_load_sensor_ != nullptr)
       {
         this->zone_active_load_sensor_->publish_state(zone_active_load);
       }
       
-      // Byte 12: Zone Power State (LonWorks: nvoOnOff)
-      // Simple ON/OFF state with IDU-level granularity
-      // - 0 = ON
-      // - 1 = OFF
+      // Byte 12: Zone Power State Flag (LonWorks: nvoOnOff)
+      // Simple ON/OFF state with IDU-level granularity (0-1)
+      // - 0 = RUNNING / ON
+      // - 1 = OFF / IDLE
       // - May jitter during state transitions (ON→OFF→ON) as different boards report at different times
       // - Multiple indoor sub-zones may share the same IDU-level ON/OFF state
       uint8_t zone_power_state = message[12];
@@ -531,9 +610,10 @@ namespace esphome
         this->zone_design_load_sensor_->publish_state(zone_design_load);
       }
       
-      // Byte 14: ODU Total Load (LonWorks: nvoThermalLoad / nvoOduLoadFactor)
-      // ODU-level compressor load estimate - sum of active loads across all zones
+      // Byte 14: ODU Total Load Index (LonWorks: nvoThermalLoad / nvoOduLoadFactor)
+      // ODU-level compressor load estimate (0-255)
       // - Same value reported to all IDUs connected to the same ODU
+      // - Approximately sum of design indices (byte 13) of all ON zones, smoothed
       // - Increases with number of active zones
       // - Max load = sum of rated loads of connected zones
       // - Goes to 0 when all zones are off
