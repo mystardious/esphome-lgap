@@ -11,6 +11,10 @@ One of the best benefits of using this integration is you can use a single LGAP 
 
 ![homeassistant](./images/ha.png)
 
+![homeassistant](./images/ha1.png)
+
+![](Screenshot 2025-11-28 at 2.40.53 pm)
+
 ## Recent Updates (November 2025)
 
 ### Temperature & Sensors
