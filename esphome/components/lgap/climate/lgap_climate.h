@@ -5,6 +5,7 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/button/button.h"
+#include "esphome/components/switch/switch.h"
 
 namespace esphome
 {
@@ -18,6 +19,16 @@ namespace esphome
       public:
         void set_parent(LGAPHVACClimate *parent) { this->parent_ = parent; }
         void control(float value) override;
+      protected:
+        LGAPHVACClimate *parent_{nullptr};
+    };
+
+    // Control lock switch (child lock)
+    class ControlLockSwitch : public switch_::Switch
+    {
+      public:
+        void set_parent(LGAPHVACClimate *parent) { this->parent_ = parent; }
+        void write_state(bool state) override;
       protected:
         LGAPHVACClimate *parent_{nullptr};
     };
@@ -41,6 +52,14 @@ namespace esphome
         void start_timer(float minutes);
         void cancel_timer();
         void loop() override;
+        
+        // Control lock
+        void set_control_lock_switch(ControlLockSwitch *switch_) {
+          this->control_lock_switch_ = switch_;
+          switch_->set_parent(this);
+        }
+        void set_control_lock(bool state);
+        bool get_control_lock() const { return this->control_lock_; }
         void set_zone_active_load_sensor(sensor::Sensor *sensor) { this->zone_active_load_sensor_ = sensor; }
         void set_zone_power_state_sensor(sensor::Sensor *sensor) { this->zone_power_state_sensor_ = sensor; }
         void set_zone_design_load_sensor(sensor::Sensor *sensor) { this->zone_design_load_sensor_ = sensor; }
@@ -58,6 +77,7 @@ namespace esphome
         uint8_t swing_{0};
         uint8_t mode_{0};
         uint8_t fan_speed_{0};
+        bool control_lock_{false};  // Child lock state (TX4 bit2)
 
         float current_temperature_{0.0f};
         float target_temperature_{0.0f};
@@ -78,6 +98,9 @@ namespace esphome
         // Timer components
         TimerDurationNumber *timer_duration_number_{nullptr};
         sensor::Sensor *timer_remaining_sensor_{nullptr};
+        
+        // Control lock switch
+        ControlLockSwitch *control_lock_switch_{nullptr};
 
         //todo: evaluate whether to use esppreferenceobject or not
         // ESPPreferenceObject power_state_preference_; //uint8_t

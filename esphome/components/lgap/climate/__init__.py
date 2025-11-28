@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import climate, sensor, number
+from esphome.components import climate, sensor, number, switch
 from esphome.const import (
     CONF_ID,
     CONF_NAME,
@@ -21,6 +21,7 @@ CODEOWNERS = ["@jourdant"]
 
 LGAP_HVAC_Climate = lgap_ns.class_("LGAPHVACClimate", cg.Component, climate.Climate)
 TimerDurationNumber = lgap_ns.class_("TimerDurationNumber", number.Number)
+ControlLockSwitch = lgap_ns.class_("ControlLockSwitch", switch.Switch)
 
 CONF_ZONE_NUMBER = "zone"
 CONF_TEMPERATURE_PUBISH_TIME = "temperature_publish_time"
@@ -33,6 +34,7 @@ CONF_ZONE_DESIGN_LOAD_SENSOR = "zone_design_load_sensor"
 CONF_ODU_TOTAL_LOAD_SENSOR = "odu_total_load_sensor"
 CONF_SLEEP_TIMER = "sleep_timer"
 CONF_TIMER_REMAINING = "timer_remaining"
+CONF_CONTROL_LOCK = "control_lock"
 
 CONFIG_SCHEMA = climate.climate_schema(
     LGAP_HVAC_Climate
@@ -86,6 +88,9 @@ CONFIG_SCHEMA = climate.climate_schema(
             accuracy_decimals=1,
             device_class=DEVICE_CLASS_DURATION,
             state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_CONTROL_LOCK): switch.switch_schema(
+            ControlLockSwitch,
         ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -298,4 +303,29 @@ async def to_code(config):
         
         sens = await sensor.new_sensor(sens_config)
         cg.add(var.set_timer_remaining_sensor(sens))
+    
+    # Control lock switch - auto-generate if not explicitly configured
+    if CONF_CONTROL_LOCK in config:
+        sw = cg.new_Pvariable(config[CONF_CONTROL_LOCK][CONF_ID])
+        await switch.register_switch(sw, config[CONF_CONTROL_LOCK])
+        cg.add(var.set_control_lock_switch(sw))
+    else:
+        from esphome.core import ID
+        climate_id = config[CONF_ID].id
+        sw_id = ID(f"{climate_id}_control_lock", is_manual=False, type=switch.Switch)
+        
+        if CONF_NAME in config:
+            sw_name = f"{config[CONF_NAME]} Control Lock"
+        else:
+            friendly_name = climate_id.replace("_", " ").title()
+            sw_name = f"{friendly_name} Control Lock"
+        
+        sw_config = switch.switch_schema(ControlLockSwitch)({
+            CONF_ID: sw_id,
+            CONF_NAME: sw_name,
+        })
+        
+        sw = cg.new_Pvariable(sw_id)
+        await switch.register_switch(sw, sw_config)
+        cg.add(var.set_control_lock_switch(sw))
     

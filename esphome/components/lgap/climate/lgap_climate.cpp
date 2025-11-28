@@ -6,6 +6,13 @@
 
 // LG LGAP Protocol Reference
 // ============================
+// Control Flags (TX message[4] / RX message[1]):
+//   bit0: ON (power state: 1=ON, 0=OFF)
+//   bit1: EXE (execute write command)
+//   bit2: Lock (control lock/child lock: 1=LOCKED, 0=UNLOCKED)
+//   bit3: Reserved (0)
+//   bit4: Plasma (air purification, optional)
+//
 // Error Code (message[5]):
 //   0 = No error / normal operation
 //   1-255 = Service codes from model's error code list
@@ -64,6 +71,17 @@ namespace esphome
           // Cancel timer
           this->parent_->cancel_timer();
         }
+      }
+    }
+
+    // Control lock switch implementation
+    void ControlLockSwitch::write_state(bool state)
+    {
+      this->publish_state(state);
+      
+      if (this->parent_ != nullptr)
+      {
+        this->parent_->set_control_lock(state);
       }
     }
     static const uint8_t MIN_TEMPERATURE = 16;  // Minimum is 16°C for heat mode
@@ -323,7 +341,7 @@ namespace esphome
 
     void LGAPHVACClimate::handle_generate_lgap_request(std::vector<uint8_t> &message, uint8_t &request_id)
     {
-      ESP_LOGD(TAG, "Generating %s request message for zone %d...", (this->write_update_pending ? "WRITE" : "READ"), this->zone_number);
+      ESP_LOGV(TAG, "Generating %s request message for zone %d...", (this->write_update_pending ? "WRITE" : "READ"), this->zone_number);
 
       // only create a write request if there is a pending message
       int write_state = this->write_update_pending ? 2 : 0;
@@ -333,7 +351,16 @@ namespace esphome
       message.push_back(0);                                // Byte 1 - always 0
       message.push_back(request_id);                       // Byte 2 - request ID
       message.push_back(this->zone_number);                // Byte 3 - zone number
-      message.push_back(write_state | this->power_state_);
+      
+      // Byte 4: Control flags (TX4 in protocol)
+      // bit0: ON (power state)
+      // bit1: EXE (execute / write_state)
+      // bit2: Lock (control lock)
+      // bit3: reserved (0)
+      // bit4: Plasma (not implemented)
+      uint8_t control_flags = this->power_state_ | write_state | (this->control_lock_ ? 0x04 : 0x00);
+      message.push_back(control_flags);
+      
       message.push_back(this->mode_ | (this->swing_ << 3) | (this->fan_speed_ << 4));
       message.push_back((uint8_t)(this->target_temperature_ - 15));
 
@@ -358,6 +385,18 @@ namespace esphome
       // process clean message as checksum already checked before reaching this point
       uint8_t power_state = (message[1] & 1);
       uint8_t mode = (message[6] & 7);
+      
+      // Control lock state (message[1] bit2 based on protocol TX4 layout)
+      bool control_lock = (message[1] & 0x04) != 0;
+      if (control_lock != this->control_lock_)
+      {
+        this->control_lock_ = control_lock;
+        if (this->control_lock_switch_ != nullptr)
+        {
+          this->control_lock_switch_->publish_state(control_lock);
+        }
+        ESP_LOGD(TAG, "Control lock %s", control_lock ? "ENABLED" : "DISABLED");
+      }
 
       // Error code (TX5 / message[5]) - 0 = OK, others = service codes
       uint8_t error_code = message[5];
@@ -736,6 +775,16 @@ namespace esphome
         }
         
         ESP_LOGV(TAG, "Sleep timer remaining: %.1f minutes", remaining_minutes);
+      }
+    }
+
+    void LGAPHVACClimate::set_control_lock(bool state)
+    {
+      if (this->control_lock_ != state)
+      {
+        this->control_lock_ = state;
+        this->write_update_pending = true;
+        ESP_LOGI(TAG, "Control lock %s", state ? "ENABLED" : "DISABLED");
       }
     }
 
