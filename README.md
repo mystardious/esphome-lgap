@@ -11,6 +11,57 @@ One of the best benefits of using this integration is you can use a single LGAP 
 
 ![homeassistant](./images/ha.png)
 
+## Recent Updates (November 2025)
+
+### Temperature & Sensors
+- ✨ **Fixed temperature calculation** - Corrected current temperature formula to `(192 - raw) / 3` for accurate readings
+- ✨ **Immediate temperature updates** - Temperatures now appear immediately in Home Assistant on startup (rate-limited thereafter)
+- ✨ **Pipe temperature sensors** - Auto-generated sensors for refrigerant inlet and outlet temperatures
+- ✨ **Temperature limits enforcement** - Heat mode: 16-30°C, other modes: 18-30°C (per LG spec)
+- ✨ **Error code sensor** - Exposes LG service error codes (0 = OK)
+
+### Load Monitoring (LonWorks Compatible)
+- ✨ **Zone Active Load** - Real-time dynamic load per zone (`nvoLoadEstimate`)
+- ✨ **Zone Power State** - ON/OFF state flag (`nvoOnOff`)
+- ✨ **Zone Design Load** - Fixed capacity/duct size index (`nciRatedCapacity`)
+- ✨ **ODU Total Load** - System-wide compressor load (`nvoThermalLoad`)
+
+### Sleep Timer
+- ✨ **Persistent timer duration** - User sets duration once (0-420 minutes), stays saved
+- ✨ **Auto-start on power ON** - Timer automatically starts countdown when AC turns ON
+- ✨ **Timer remaining sensor** - Real-time countdown display
+- ✨ **Auto-shutoff** - AC turns OFF when timer expires, duration stays saved for next use
+
+### Control Locks & Security
+- ✨ **Control Lock** - Master child lock (protocol TX4 bit2)
+- ✨ **Temperature Lock** - Prevent temperature changes
+- ✨ **Fan Speed Lock** - Prevent fan speed changes
+- ✨ **Mode Lock** - Prevent mode changes
+- ✨ **Power Only Mode** - Allow only ON/OFF, lock all other controls
+- ✨ **Wall controller enforcement** - Automatically reverts unauthorized changes made at physical wall controller when locks are active
+
+### Optional Features (Opt-In)
+- ✨ **Plasma ion control** - Air purification switch (protocol TX4 bit4) - `supports_plasma: true`
+- ✨ **Auto swing mode** - Auto airflow for ducted units - `supports_auto_swing: true`
+- ✨ **Auto fan speed** - Auto fan mode - `supports_auto_fan: true`
+- ✨ **Quiet fan mode** - Silent operation - `supports_quiet_fan: true`
+- ✨ **Turbo fan mode** - Maximum power - `supports_turbo_fan: true`
+
+### Quality of Life
+- ✨ **Reduced log verbosity** - Moved frequent messages to VERBOSE level for cleaner logs
+- ✨ **Race condition fix** - Fixed temperature change race condition with `write_update_pending` flag
+- ✨ **Clean UI by default** - All advanced features disabled by default, opt-in per zone
+- ✨ **Auto-generated entities** - All sensors, numbers, and switches auto-created with smart naming
+
+### ⚠️ Configuration Requirements
+If upgrading from an older version, ensure your YAML includes these base components (required for auto-generated entities):
+```yaml
+sensor:
+number:
+switch:
+button:
+```
+
 ## Features
 
 - ✅ **Full Climate Control** - Native Home Assistant climate entity with standard controls
