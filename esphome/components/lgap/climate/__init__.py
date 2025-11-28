@@ -99,9 +99,6 @@ CONFIG_SCHEMA = climate.climate_schema(
             TimerDurationNumber,
             unit_of_measurement=UNIT_MINUTE,
             device_class=DEVICE_CLASS_DURATION,
-            min_value=0,  # 0 turns off timer
-            max_value=420,  # Up to 7 hours
-            step=1,
         ),
         cv.Optional(CONF_TIMER_REMAINING): sensor.sensor_schema(
             unit_of_measurement=UNIT_MINUTE,
