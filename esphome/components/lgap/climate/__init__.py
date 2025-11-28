@@ -301,9 +301,6 @@ async def to_code(config):
             TimerDurationNumber,
             unit_of_measurement=UNIT_MINUTE,
             device_class=DEVICE_CLASS_DURATION,
-            min_value=0,
-            max_value=420,
-            step=1,
         )({
             CONF_ID: num_id,
             CONF_NAME: num_name,
