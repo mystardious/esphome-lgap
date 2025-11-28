@@ -7,7 +7,7 @@ from esphome.const import (
 )
 from esphome import pins
 
-DEPENDENCIES = ["uart", "sensor"]
+DEPENDENCIES = ["uart", "sensor", "number", "switch"]
 CODEOWNERS = ["@jourdant"]
 MULTI_CONF = True
 
