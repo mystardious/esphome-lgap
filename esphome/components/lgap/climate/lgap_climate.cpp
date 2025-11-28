@@ -36,6 +36,10 @@
 // Mode (message[6] bits 0-2):
 //   0 = COOL, 1 = DRY, 2 = FAN_ONLY, 3 = AUTO, 4 = HEAT
 //
+// Auto Swing (message[6] bit 3):
+//   0 = OFF (manual airflow), 1 = AUTO (automatic airflow pattern)
+//   Note: For ducted units, this controls software airflow logic, not physical vanes
+//
 // Fan Speed (message[6] bits 4-6):
 //   0 = NO_CHANGE, 1 = LOW, 2 = MEDIUM, 3 = HIGH, 4 = AUTO
 //   5 = SLOW (quiet), 6 = POWER/TURBO, 7 = SLOW+POWER (rare)
@@ -215,10 +219,16 @@ namespace esphome
           climate::CLIMATE_FAN_FOCUS,  // TURBO/POWER mode
       });
 
-      traits.set_supported_swing_modes({
-          climate::CLIMATE_SWING_OFF,
-          climate::CLIMATE_SWING_VERTICAL,
-      });
+      // Auto swing (auto airflow) - optional feature for ducted units
+      // Only expose swing control if explicitly enabled in YAML
+      if (this->supports_auto_swing_)
+      {
+        traits.set_supported_swing_modes({
+            climate::CLIMATE_SWING_OFF,         // Manual airflow / Off (first option)
+            climate::CLIMATE_SWING_AUTO,        // Auto airflow (displays as "Auto" in HA)
+        });
+      }
+      // If not enabled, don't set swing modes at all - HA won't show swing control
 
       // Temperature limits per LG specification:
       // Heat mode: 16-30°C, all other modes: 18-30°C
@@ -385,13 +395,23 @@ namespace esphome
 
         if (this->swing_mode != swing_mode)
         {
+          // Auto Swing encoding (for ducted units: auto airflow mode)
+          // 0 = OFF (manual airflow)
+          // 1 = AUTO (automatic airflow pattern)
+          // Note: Ducted IDUs have no physical vanes - this controls software airflow logic
+          // CLIMATE_SWING_AUTO displays as "Auto" in Home Assistant
           if (swing_mode == climate::CLIMATE_SWING_OFF)
           {
             this->swing_ = 0;
           }
-          else if (swing_mode == climate::CLIMATE_SWING_VERTICAL)
+          else if (swing_mode == climate::CLIMATE_SWING_AUTO)
           {
-            this->swing_ = 1;
+            if (!this->supports_auto_swing_)
+            {
+              ESP_LOGW(TAG, "Auto swing not supported on this zone - ignoring");
+              return;
+            }
+            this->swing_ = 1;  // Auto airflow
           }
 
           // publish state
@@ -465,6 +485,8 @@ namespace esphome
       uint8_t control_flags = this->power_state_ | write_state | (this->control_lock_ ? 0x04 : 0x00);
       message.push_back(control_flags);
       
+      // Byte 5: Mode (bits 0-2) | Swing (bits 3-4) | Fan Speed (bits 4-6)
+      // swing_ values: 0=OFF, 1=VERTICAL, 2=AUTO
       message.push_back(this->mode_ | (this->swing_ << 3) | (this->fan_speed_ << 4));
       message.push_back((uint8_t)(this->target_temperature_ - 15));
 
@@ -574,7 +596,11 @@ namespace esphome
           }
         }
 
-        // swing options
+        // Auto Swing (message[6] bit 3) - for ducted units: auto airflow mode
+        // 0 = OFF (manual airflow)
+        // 1 = AUTO (automatic airflow pattern)
+        // Note: Ducted IDUs have no physical vanes - this is software airflow control
+        // CLIMATE_SWING_AUTO displays as "Auto" in Home Assistant
         uint8_t swing = (message[6] >> 3) & 1;
         if (swing != this->swing_)
         {
@@ -584,7 +610,7 @@ namespace esphome
           }
           else if (swing == 1)
           {
-            this->swing_mode = climate::CLIMATE_SWING_VERTICAL;
+            this->swing_mode = climate::CLIMATE_SWING_AUTO;  // Displays as "Auto" in HA
           }
           else
           {

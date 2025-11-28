@@ -79,6 +79,7 @@ namespace esphome
         void dump_config() override;       
         void setup() override;
         void set_temperature_publish_time(int temperature_publish_time) { this->temperature_publish_time_ = temperature_publish_time; }
+        void set_supports_auto_swing(bool supports) { this->supports_auto_swing_ = supports; }
         void set_pipe_in_sensor(sensor::Sensor *sensor) { this->pipe_in_sensor_ = sensor; }
         void set_pipe_out_sensor(sensor::Sensor *sensor) { this->pipe_out_sensor_ = sensor; }
         void set_error_code_sensor(sensor::Sensor *sensor) { this->error_code_sensor_ = sensor; }
@@ -135,6 +136,8 @@ namespace esphome
       protected:
         uint32_t temperature_publish_time_{300000};
         uint32_t temperature_last_publish_time_{0};
+        
+        bool supports_auto_swing_{false};  // Whether to expose auto swing mode
 
         uint8_t power_state_{0};
         uint8_t swing_{0};
