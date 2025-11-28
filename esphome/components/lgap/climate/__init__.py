@@ -26,6 +26,7 @@ CONF_ZONE_NUMBER = "zone"
 CONF_TEMPERATURE_PUBISH_TIME = "temperature_publish_time"
 CONF_PIPE_IN_SENSOR = "pipe_in_sensor"
 CONF_PIPE_OUT_SENSOR = "pipe_out_sensor"
+CONF_ERROR_CODE_SENSOR = "error_code_sensor"
 CONF_ZONE_ACTIVE_LOAD_SENSOR = "zone_active_load_sensor"
 CONF_ZONE_POWER_STATE_SENSOR = "zone_power_state_sensor"
 CONF_ZONE_DESIGN_LOAD_SENSOR = "zone_design_load_sensor"
@@ -50,6 +51,10 @@ CONFIG_SCHEMA = climate.climate_schema(
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
             device_class=DEVICE_CLASS_TEMPERATURE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_ERROR_CODE_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
         cv.Optional(CONF_ZONE_ACTIVE_LOAD_SENSOR): sensor.sensor_schema(
@@ -167,6 +172,32 @@ async def to_code(config):
         
         sens = await sensor.new_sensor(pipe_out_config)
         cg.add(var.set_pipe_out_sensor(sens))
+    
+    # Error code sensor - auto-generate if not explicitly configured
+    if CONF_ERROR_CODE_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_ERROR_CODE_SENSOR])
+        cg.add(var.set_error_code_sensor(sens))
+    else:
+        from esphome.core import ID
+        climate_id = config[CONF_ID].id
+        sens_id = ID(f"{climate_id}_error_code", is_manual=False, type=sensor.Sensor)
+        
+        if CONF_NAME in config:
+            sens_name = f"{config[CONF_NAME]} Error Code"
+        else:
+            friendly_name = climate_id.replace("_", " ").title()
+            sens_name = f"{friendly_name} Error Code"
+        
+        sens_config = sensor.sensor_schema(
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        )({
+            CONF_ID: sens_id,
+            CONF_NAME: sens_name,
+        })
+        
+        sens = await sensor.new_sensor(sens_config)
+        cg.add(var.set_error_code_sensor(sens))
     
     # Auto-generate LonWorks-aligned load sensors
     # These track bytes in the 16-byte LGAP message matching LG's PI485→LonWorks mappings

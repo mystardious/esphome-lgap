@@ -30,6 +30,7 @@ namespace esphome
         void set_temperature_publish_time(int temperature_publish_time) { this->temperature_publish_time_ = temperature_publish_time; }
         void set_pipe_in_sensor(sensor::Sensor *sensor) { this->pipe_in_sensor_ = sensor; }
         void set_pipe_out_sensor(sensor::Sensor *sensor) { this->pipe_out_sensor_ = sensor; }
+        void set_error_code_sensor(sensor::Sensor *sensor) { this->error_code_sensor_ = sensor; }
         
         // Timer control
         void set_timer_duration_number(TimerDurationNumber *number) { 
@@ -68,6 +69,7 @@ namespace esphome
         
         sensor::Sensor *pipe_in_sensor_{nullptr};
         sensor::Sensor *pipe_out_sensor_{nullptr};
+        sensor::Sensor *error_code_sensor_{nullptr};            // Byte 5 - Error code (0=OK, others=service codes)
         sensor::Sensor *zone_active_load_sensor_{nullptr};      // Byte 11 - LonWorks nvoLoadEstimate
         sensor::Sensor *zone_power_state_sensor_{nullptr};      // Byte 12 - LonWorks nvoOnOff
         sensor::Sensor *zone_design_load_sensor_{nullptr};      // Byte 13 - LonWorks nciRatedCapacity

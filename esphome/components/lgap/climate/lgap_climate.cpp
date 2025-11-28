@@ -6,6 +6,11 @@
 
 // LG LGAP Protocol Reference
 // ============================
+// Error Code (message[5]):
+//   0 = No error / normal operation
+//   1-255 = Service codes from model's error code list
+//   Check model documentation for specific error code meanings
+//
 // Mode (message[6] bits 0-2):
 //   0 = COOL, 1 = DRY, 2 = FAN_ONLY, 3 = AUTO, 4 = HEAT
 //
@@ -353,6 +358,18 @@ namespace esphome
       // process clean message as checksum already checked before reaching this point
       uint8_t power_state = (message[1] & 1);
       uint8_t mode = (message[6] & 7);
+
+      // Error code (TX5 / message[5]) - 0 = OK, others = service codes
+      uint8_t error_code = message[5];
+      if (this->error_code_sensor_ != nullptr)
+      {
+        this->error_code_sensor_->publish_state(error_code);
+      }
+      
+      if (error_code != 0)
+      {
+        ESP_LOGW(TAG, "Zone %d error code: %d", this->zone_number, error_code);
+      }
 
       // Don't update control state from device while a write command is pending
       // This prevents the device's old state from overwriting the user's new command
