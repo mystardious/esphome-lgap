@@ -108,7 +108,7 @@ climate:
     temperature_publish_time: 300000ms
     
     # Optional: Enable auto airflow mode for ducted units (default: false)
-    # Shows "Swing Set: Off or Auto" in Home Assistant
+    # Shows "Swing Set: Off or On" in Home Assistant
     supports_auto_swing: true
     
     # Optional: Enable auto fan speed mode (default: false)
@@ -234,7 +234,7 @@ Swing control is disabled by default. For ducted units with auto airflow capabil
 supports_auto_swing: true
 ```
 
-This will add "Off" and "Auto" swing options to Home Assistant.
+This will add "Off" and "On" swing options to Home Assistant.
 
 ### Error code sensor showing non-zero value
 

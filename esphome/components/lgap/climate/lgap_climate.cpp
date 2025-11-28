@@ -248,8 +248,8 @@ namespace esphome
       if (this->supports_auto_swing_)
       {
         traits.set_supported_swing_modes({
-            climate::CLIMATE_SWING_OFF,         // Manual airflow / Off (first option)
-            climate::CLIMATE_SWING_BOTH,        // Auto airflow (displays as "Auto" in HA)
+            climate::CLIMATE_SWING_OFF,         // Manual airflow (displays as "Off" in HA)
+            climate::CLIMATE_SWING_ON,          // Auto airflow (displays as "On" in HA)
         });
       }
       // If not enabled, don't set swing modes at all - HA won't show swing control
@@ -421,14 +421,14 @@ namespace esphome
         {
           // Auto Swing encoding (for ducted units: auto airflow mode)
           // 0 = OFF (manual airflow)
-          // 1 = AUTO (automatic airflow pattern)
+          // 1 = ON (automatic airflow pattern)
           // Note: Ducted IDUs have no physical vanes - this controls software airflow logic
-          // CLIMATE_SWING_BOTH displays as "Auto" in Home Assistant
+          // CLIMATE_SWING_ON displays as "On" in Home Assistant
           if (swing_mode == climate::CLIMATE_SWING_OFF)
           {
             this->swing_ = 0;
           }
-          else if (swing_mode == climate::CLIMATE_SWING_BOTH)
+          else if (swing_mode == climate::CLIMATE_SWING_ON)
           {
             if (!this->supports_auto_swing_)
             {
@@ -634,9 +634,9 @@ namespace esphome
 
         // Auto Swing (message[6] bit 3) - for ducted units: auto airflow mode
         // 0 = OFF (manual airflow)
-        // 1 = AUTO (automatic airflow pattern)
+        // 1 = ON (automatic airflow pattern)
         // Note: Ducted IDUs have no physical vanes - this is software airflow control
-        // CLIMATE_SWING_BOTH displays as "Auto" in Home Assistant
+        // CLIMATE_SWING_ON displays as "On" in Home Assistant
         uint8_t swing = (message[6] >> 3) & 1;
         if (swing != this->swing_)
         {
@@ -646,7 +646,7 @@ namespace esphome
           }
           else if (swing == 1)
           {
-            this->swing_mode = climate::CLIMATE_SWING_BOTH;  // Displays as "Auto" in HA
+            this->swing_mode = climate::CLIMATE_SWING_ON;  // Displays as "On" in HA
           }
           else
           {
