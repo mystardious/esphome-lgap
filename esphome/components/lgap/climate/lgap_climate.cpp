@@ -10,6 +10,26 @@ namespace esphome
   {
 
     static const char *const TAG = "lgap.climate";
+
+    // Timer duration number implementation with automatic start/cancel
+    void TimerDurationNumber::control(float value)
+    {
+      this->publish_state(value);
+      
+      if (this->parent_ != nullptr)
+      {
+        if (value > 0)
+        {
+          // Start/update timer
+          this->parent_->start_timer(value);
+        }
+        else
+        {
+          // Cancel timer
+          this->parent_->cancel_timer();
+        }
+      }
+    }
     static const uint8_t MIN_TEMPERATURE = 16;  // Minimum is 16°C for heat mode
     static const uint8_t MIN_TEMPERATURE_NON_HEAT = 18;  // 18°C minimum for cool/dry/fan/auto modes
     static const uint8_t MAX_TEMPERATURE = 30;  // Maximum is 30°C for all modes
@@ -534,5 +554,93 @@ namespace esphome
         this->publish_state();
       }
     }
+
+    void LGAPHVACClimate::start_timer(float duration_minutes)
+    {
+      if (duration_minutes <= 0)
+      {
+        ESP_LOGW(TAG, "Cannot start timer - duration must be > 0 minutes");
+        this->cancel_timer();
+        return;
+      }
+
+      uint32_t duration_ms = static_cast<uint32_t>(duration_minutes * 60 * 1000);
+      this->timer_end_time_ = millis() + duration_ms;
+      this->timer_active_ = true;
+      this->timer_last_update_ = millis();
+
+      ESP_LOGI(TAG, "Sleep timer set for %.0f minutes", duration_minutes);
+      
+      // Publish initial remaining time
+      if (this->timer_remaining_sensor_ != nullptr)
+      {
+        this->timer_remaining_sensor_->publish_state(duration_minutes);
+      }
+    }
+
+    void LGAPHVACClimate::cancel_timer()
+    {
+      if (this->timer_active_)
+      {
+        this->timer_active_ = false;
+        ESP_LOGI(TAG, "Sleep timer cancelled");
+        
+        // Publish 0 remaining time
+        if (this->timer_remaining_sensor_ != nullptr)
+        {
+          this->timer_remaining_sensor_->publish_state(0);
+        }
+      }
+    }
+
+    void LGAPHVACClimate::loop()
+    {
+      if (!this->timer_active_)
+        return;
+
+      uint32_t now = millis();
+      
+      // Check if timer has expired
+      if (now >= this->timer_end_time_)
+      {
+        ESP_LOGI(TAG, "Sleep timer expired - turning unit OFF");
+        this->timer_active_ = false;
+        
+        // Turn off the unit
+        auto call = this->make_call();
+        call.set_mode(climate::CLIMATE_MODE_OFF);
+        call.perform();
+        
+        // Reset timer to 0
+        if (this->timer_duration_number_ != nullptr)
+        {
+          this->timer_duration_number_->publish_state(0);
+        }
+        
+        // Publish 0 remaining time
+        if (this->timer_remaining_sensor_ != nullptr)
+        {
+          this->timer_remaining_sensor_->publish_state(0);
+        }
+        return;
+      }
+
+      // Update remaining time every 10 seconds
+      if (now - this->timer_last_update_ >= 10000)
+      {
+        this->timer_last_update_ = now;
+        
+        uint32_t remaining_ms = this->timer_end_time_ - now;
+        float remaining_minutes = remaining_ms / 60000.0f;
+        
+        if (this->timer_remaining_sensor_ != nullptr)
+        {
+          this->timer_remaining_sensor_->publish_state(remaining_minutes);
+        }
+        
+        ESP_LOGV(TAG, "Sleep timer remaining: %.1f minutes", remaining_minutes);
+      }
+    }
+
   } // namespace lgap
 } // namespace esphome

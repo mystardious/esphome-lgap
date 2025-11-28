@@ -1,13 +1,13 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import climate, sensor
+from esphome.components import climate, sensor, number
 from esphome.const import (
     CONF_ID,
     CONF_NAME,
-    UNIT_KILOWATT,
     UNIT_CELSIUS,
-    DEVICE_CLASS_POWER,
+    UNIT_MINUTE,
     DEVICE_CLASS_TEMPERATURE,
+    DEVICE_CLASS_DURATION,
     STATE_CLASS_MEASUREMENT,
 )
 from .. import (
@@ -20,6 +20,7 @@ DEPENDENCIES = ["lgap"]
 CODEOWNERS = ["@jourdant"]
 
 LGAP_HVAC_Climate = lgap_ns.class_("LGAPHVACClimate", cg.Component, climate.Climate)
+TimerDurationNumber = lgap_ns.class_("TimerDurationNumber", number.Number)
 
 CONF_ZONE_NUMBER = "zone"
 CONF_TEMPERATURE_PUBISH_TIME = "temperature_publish_time"
@@ -29,6 +30,8 @@ CONF_ZONE_ACTIVE_LOAD_SENSOR = "zone_active_load_sensor"
 CONF_ZONE_POWER_STATE_SENSOR = "zone_power_state_sensor"
 CONF_ZONE_DESIGN_LOAD_SENSOR = "zone_design_load_sensor"
 CONF_ODU_TOTAL_LOAD_SENSOR = "odu_total_load_sensor"
+CONF_SLEEP_TIMER = "sleep_timer"
+CONF_TIMER_REMAINING = "timer_remaining"
 
 CONFIG_SCHEMA = climate.climate_schema(
     LGAP_HVAC_Climate
@@ -63,6 +66,20 @@ CONFIG_SCHEMA = climate.climate_schema(
         ),
         cv.Optional(CONF_ODU_TOTAL_LOAD_SENSOR): sensor.sensor_schema(
             accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_SLEEP_TIMER): number.number_schema(
+            TimerDurationNumber,
+            unit_of_measurement=UNIT_MINUTE,
+            device_class=DEVICE_CLASS_DURATION,
+            min_value=0,  # 0 turns off timer
+            max_value=420,  # Up to 7 hours
+            step=1,
+        ),
+        cv.Optional(CONF_TIMER_REMAINING): sensor.sensor_schema(
+            unit_of_measurement=UNIT_MINUTE,
+            accuracy_decimals=1,
+            device_class=DEVICE_CLASS_DURATION,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
     }
@@ -189,4 +206,65 @@ async def to_code(config):
             
             sens = await sensor.new_sensor(sensor_config)
             cg.add(getattr(var, setter_method)(sens))
+    
+    # Sleep timer - auto-generate if not explicitly configured
+    # Automatic timer: set minutes to start, set to 0 to cancel
+    if CONF_SLEEP_TIMER in config:
+        num = cg.new_Pvariable(config[CONF_SLEEP_TIMER][CONF_ID])
+        await number.register_number(num, config[CONF_SLEEP_TIMER], min_value=0, max_value=420, step=1)
+        cg.add(var.set_timer_duration_number(num))
+    else:
+        from esphome.core import ID
+        climate_id = config[CONF_ID].id
+        num_id = ID(f"{climate_id}_sleep_timer", is_manual=False, type=number.Number)
+        
+        if CONF_NAME in config:
+            num_name = f"{config[CONF_NAME]} Sleep Timer"
+        else:
+            friendly_name = climate_id.replace("_", " ").title()
+            num_name = f"{friendly_name} Sleep Timer"
+        
+        num_config = number.number_schema(
+            TimerDurationNumber,
+            unit_of_measurement=UNIT_MINUTE,
+            device_class=DEVICE_CLASS_DURATION,
+            min_value=0,
+            max_value=420,
+            step=1,
+        )({
+            CONF_ID: num_id,
+            CONF_NAME: num_name,
+        })
+        
+        num = cg.new_Pvariable(num_id)
+        await number.register_number(num, num_config, min_value=0, max_value=420, step=1)
+        cg.add(var.set_timer_duration_number(num))
+    
+    # Timer remaining sensor (shows countdown)
+    if CONF_TIMER_REMAINING in config:
+        sens = await sensor.new_sensor(config[CONF_TIMER_REMAINING])
+        cg.add(var.set_timer_remaining_sensor(sens))
+    else:
+        from esphome.core import ID
+        climate_id = config[CONF_ID].id
+        sens_id = ID(f"{climate_id}_timer_remaining", is_manual=False, type=sensor.Sensor)
+        
+        if CONF_NAME in config:
+            sens_name = f"{config[CONF_NAME]} Timer Remaining"
+        else:
+            friendly_name = climate_id.replace("_", " ").title()
+            sens_name = f"{friendly_name} Timer Remaining"
+        
+        sens_config = sensor.sensor_schema(
+            unit_of_measurement=UNIT_MINUTE,
+            accuracy_decimals=1,
+            device_class=DEVICE_CLASS_DURATION,
+            state_class=STATE_CLASS_MEASUREMENT,
+        )({
+            CONF_ID: sens_id,
+            CONF_NAME: sens_name,
+        })
+        
+        sens = await sensor.new_sensor(sens_config)
+        cg.add(var.set_timer_remaining_sensor(sens))
     
