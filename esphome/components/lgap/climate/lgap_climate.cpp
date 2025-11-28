@@ -80,14 +80,17 @@ namespace esphome
       
       if (this->parent_ != nullptr)
       {
-        if (value > 0)
+        // Save the duration (timer will auto-start when AC turns ON)
+        this->parent_->set_timer_duration_minutes(value);
+        
+        // If AC is currently ON and duration > 0, start timer now
+        if (value > 0 && this->parent_->mode != climate::CLIMATE_MODE_OFF)
         {
-          // Start/update timer
           this->parent_->start_timer(value);
         }
-        else
+        else if (value == 0)
         {
-          // Cancel timer
+          // Duration set to 0 - cancel any active timer
           this->parent_->cancel_timer();
         }
       }
