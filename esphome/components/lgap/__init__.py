@@ -1,17 +1,13 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.cpp_helpers import gpio_pin_expression
-from esphome.components import uart, sensor
+from esphome.components import uart
 from esphome.const import (
     CONF_ID,
-    CONF_NAME,
-    UNIT_KILOWATT,
-    DEVICE_CLASS_POWER,
-    STATE_CLASS_MEASUREMENT,
 )
 from esphome import pins
 
-DEPENDENCIES = ["uart", "sensor"]
+DEPENDENCIES = ["uart"]
 CODEOWNERS = ["@jourdant"]
 MULTI_CONF = True
 
