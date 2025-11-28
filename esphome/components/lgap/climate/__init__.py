@@ -289,7 +289,7 @@ async def to_code(config):
     else:
         from esphome.core import ID
         climate_id = config[CONF_ID].id
-        num_id = ID(f"{climate_id}_sleep_timer", is_manual=False, type=number.Number)
+        num_id = ID(f"{climate_id}_sleep_timer", is_manual=False, type=TimerDurationNumber)
         
         if CONF_NAME in config:
             num_name = f"{config[CONF_NAME]} Sleep Timer"
@@ -306,7 +306,7 @@ async def to_code(config):
             CONF_NAME: num_name,
         })
         
-        num = cg.new_Pvariable(num_id)
+        num = cg.new_Pvariable(num_id, TimerDurationNumber)
         await number.register_number(num, num_config, min_value=0, max_value=420, step=1)
         cg.add(var.set_timer_duration_number(num))
     
@@ -346,7 +346,7 @@ async def to_code(config):
     else:
         from esphome.core import ID
         climate_id = config[CONF_ID].id
-        sw_id = ID(f"{climate_id}_control_lock", is_manual=False, type=switch.Switch)
+        sw_id = ID(f"{climate_id}_control_lock", is_manual=False, type=ControlLockSwitch)
         
         if CONF_NAME in config:
             sw_name = f"{config[CONF_NAME]} Control Lock"
@@ -359,7 +359,7 @@ async def to_code(config):
             CONF_NAME: sw_name,
         })
         
-        sw = cg.new_Pvariable(sw_id)
+        sw = cg.new_Pvariable(sw_id, ControlLockSwitch)
         await switch.register_switch(sw, sw_config)
         cg.add(var.set_control_lock_switch(sw))
     
@@ -379,7 +379,7 @@ async def to_code(config):
         else:
             from esphome.core import ID
             climate_id = config[CONF_ID].id
-            sw_id = ID(f"{climate_id}_{id_suffix}", is_manual=False, type=switch.Switch)
+            sw_id = ID(f"{climate_id}_{id_suffix}", is_manual=False, type=switch_class)
             
             if CONF_NAME in config:
                 sw_name = f"{config[CONF_NAME]} {name_suffix}"
@@ -392,7 +392,7 @@ async def to_code(config):
                 CONF_NAME: sw_name,
             })
             
-            sw = cg.new_Pvariable(sw_id)
+            sw = cg.new_Pvariable(sw_id, switch_class)
             await switch.register_switch(sw, sw_config)
             cg.add(getattr(var, setter_method)(sw))
     
@@ -405,7 +405,7 @@ async def to_code(config):
         else:
             from esphome.core import ID
             climate_id = config[CONF_ID].id
-            sw_id = ID(f"{climate_id}_plasma", is_manual=False, type=switch.Switch)
+            sw_id = ID(f"{climate_id}_plasma", is_manual=False, type=PlasmaSwitch)
             
             if CONF_NAME in config:
                 sw_name = f"{config[CONF_NAME]} Plasma"
@@ -418,7 +418,7 @@ async def to_code(config):
                 CONF_NAME: sw_name,
             })
             
-            sw = cg.new_Pvariable(sw_id)
+            sw = cg.new_Pvariable(sw_id, PlasmaSwitch)
             await switch.register_switch(sw, sw_config)
             cg.add(var.set_plasma_switch(sw))
     
